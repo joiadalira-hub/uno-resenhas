@@ -1,0 +1,13 @@
+{
+  "name": "uno-resenhas",
+  "version": "1.0.0",
+  "description": "Uno Resenhas: jogo de cartas com 5 cores, combo, Ctrl+C e salas online",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node servidor/servidor.js",
+    "test": "node --test testes/*.test.js"
+  }
+}

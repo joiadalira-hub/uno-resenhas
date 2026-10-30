@@ -1,0 +1,10 @@
+# Configuração do Render (Blueprint): um serviço web grátis que monta o site e liga o servidor
+services:
+  - type: web
+    name: uno-resenhas
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /saude
+    autoDeploy: true

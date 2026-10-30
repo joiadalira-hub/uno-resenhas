@@ -16,7 +16,8 @@ const PORTA = Number(process.env.PORT) || 3000;
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
 const NOMES_BOTS = ['Ana', 'Rui', 'Bia', 'Léo', 'Duda', 'Caio', 'Mel', 'Nina', 'Tito'];
 const ESPERA_RECONEXAO = 45000; // depois disso, um bot assume a mão de quem caiu
-const ESPERA_VOTOS = 90000;      // quem não votar até lá continua na mesa
+const ESPERA_VOTOS = 90000;
+const ESPERA_SALA = 3 * 60 * 1000;      // na sala de espera, quem caiu (ex.: foi mandar o link no WhatsApp) guarda o lugar por 3 min      // quem não votar até lá continua na mesa
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // ---------------- site ----------------
@@ -304,13 +305,10 @@ class Sala {
     assento.conectado = false;
     assento.conexao = null;
     if (this.fase === 'espera') {
-      if (assento.id === this.dono) {
-        const outro = this.humanos().find((h) => h !== assento && h.conectado);
-        if (outro) this.dono = outro.id;
-      }
-      const i = this.assentos.indexOf(assento);
-      this.assentos[i] = { tipo: 'aberto', id: `a${this.seq++}` };
+      // celular que troca de app derruba a conexão: o lugar (e o posto de dono) fica guardado
       this.enviarSala();
+      clearTimeout(assento.timerSaida);
+      assento.timerSaida = setTimeout(() => this.liberarLugar(assento), ESPERA_SALA);
       return;
     }
     this.enviarSala();
@@ -320,7 +318,18 @@ class Sala {
       if (j && !j.bot) { j.bot = true; log('bot assumiu', this.codigo, assento.nome); this.agendar({ tipo: 'nada' }); this.enviarEstado(null); }
     }, ESPERA_RECONEXAO);
   }
+  liberarLugar(assento) {
+    const i = this.assentos.indexOf(assento);
+    if (i < 0 || assento.conectado || this.fase !== 'espera') return;
+    this.assentos[i] = { tipo: 'aberto', id: `a${this.seq++}` };
+    if (assento.id === this.dono) {
+      const outro = this.humanos().find((h) => h.conectado);
+      if (outro) this.dono = outro.id;
+    }
+    this.enviarSala();
+  }
   voltou(assento, conexao) {
+    clearTimeout(assento.timerSaida);
     assento.conexao = conexao;
     assento.conectado = true;
     if (this.e) { const j = this.e.jogadores.find((x) => x.id === assento.id); if (j) j.bot = false; }
@@ -410,7 +419,7 @@ function tratar(conexao, msg, ctx) {
   }
   if (tipo === 'sair') {
     const i = sala.assentos.indexOf(assento);
-    if (sala.fase === 'espera') sala.caiu(assento);
+    if (sala.fase === 'espera') { assento.conectado = false; assento.conexao = null; assento.token = null; sala.liberarLugar(assento); }
     else if (i >= 0 && assento.pendente) { // ia entrar na próxima mão e desistiu
       sala.assentos.splice(i, 1);
       const bot = sala.assentos.find((a) => a.tipo === 'bot' && a.sai);

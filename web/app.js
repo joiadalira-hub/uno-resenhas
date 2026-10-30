@@ -1604,21 +1604,23 @@ function enviar(msg) {
 function conectar(aoAbrir) {
   if (!/^https?:$/.test(location.protocol)) { mostrarErroOnline('O modo online funciona no site do jogo. Aqui dá para treinar contra os bots.'); return; }
   const o = S.online || (S.online = { fila: [], tentativas: 0 });
+  if (aoAbrir && !o.codigo) o.primeiro = aoAbrir; // criar/entrar: repete até conseguir, mesmo se a 1ª conexão cair
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   o.ws = ws;
   ws.onopen = () => {
-    o.tentativas = 0; o.caiu = false;
-    if (aoAbrir) aoAbrir();
+    o.tentativas = 0; o.caiu = false; o.ultimaMsg = Date.now();
+    if (o.codigo) enviar({ tipo: 'entrar', codigo: o.codigo, token: o.token, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha });
+    else if (o.primeiro) o.primeiro();
     const fila = o.fila; o.fila = [];
     fila.forEach((m) => ws.send(JSON.stringify(m)));
     clearInterval(o.ping); o.ping = setInterval(() => enviar({ tipo: 'ping' }), 25000);
     if (S.tela === 'mesa' || S.tela === 'espera') render();
   };
-  ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } receberDoServidor(m); };
+  ws.onmessage = (ev) => { o.ultimaMsg = Date.now(); let m; try { m = JSON.parse(ev.data); } catch { return; } receberDoServidor(m); };
   ws.onclose = () => {
     clearInterval(o.ping);
     if (S.online !== o || o.saindo) return;
-    if (!o.codigo && o.tentativas >= 2) { // nunca chegou a entrar: desiste e avisa
+    if (!o.codigo && o.tentativas >= 7) { // nunca chegou a entrar (~1 min tentando): desiste e avisa
       S.online = null;
       mostrarErroOnline('Não consegui falar com o servidor. Tente de novo em alguns segundos (no plano grátis ele pode levar até 1 minuto para acordar).');
       const b = document.getElementById('comecar') || document.getElementById('btn-entrar'); if (b) b.disabled = false;
@@ -1626,13 +1628,30 @@ function conectar(aoAbrir) {
       return;
     }
     o.caiu = true;
+    if (!o.codigo) { const el = document.getElementById('erro-criar') || document.getElementById('erro-entrar'); if (el) el.textContent = 'Acordando o servidor… (no plano grátis pode levar até 1 minuto)'; }
     if (S.tela === 'mesa' || S.tela === 'espera') render();
     // tenta voltar para a mesma sala com o mesmo lugar
     const atraso = Math.min(8000, 1000 * 2 ** o.tentativas++);
-    setTimeout(() => { if (S.online === o && !o.saindo) conectar(() => o.codigo && ws.send && enviar({ tipo: 'entrar', codigo: o.codigo, token: o.token })); }, atraso);
+    clearTimeout(o.timerVolta);
+    o.timerVolta = setTimeout(() => { if (S.online === o && !o.saindo && o.ws === ws) conectar(); }, atraso);
   };
   ws.onerror = () => {};
 }
+// Voltou para o jogo (celular desbloqueado, voltou do WhatsApp…): reconecta na hora se a conexão morreu
+function conferirConexao() {
+  const o = S.online;
+  if (!o || o.saindo || document.visibilityState !== 'visible') return;
+  const ws = o.ws;
+  const morta = !ws || ws.readyState > 1 || (ws.readyState === 1 && Date.now() - (o.ultimaMsg || 0) > 35000);
+  if (!morta) return;
+  clearTimeout(o.timerVolta); clearInterval(o.ping);
+  o.tentativas = 0;
+  if (ws && ws.readyState <= 1) { ws.onclose = null; try { ws.close(); } catch { /* já fechada */ } }
+  conectar();
+}
+document.addEventListener('visibilitychange', conferirConexao);
+window.addEventListener('pageshow', conferirConexao);
+window.addEventListener('online', conferirConexao);
 function mostrarErroOnline(msg) {
   const el = document.getElementById('erro-criar') || document.getElementById('erro-entrar');
   if (el) el.textContent = msg; else { S.erroInicio = msg; }
@@ -1651,6 +1670,7 @@ function entrarNaSala(codigo, senha) {
   const token = salvo && salvo.codigo === codigo ? salvo.token : null;
   S.online = null;
   conectar(() => enviar({ tipo: 'entrar', codigo, senha, token, apelido: S.apelido || 'Jogador', avatar: S.avatar }));
+  S.online.senha = senha;
 }
 function sairDaSala() {
   const o = S.online;
@@ -1684,6 +1704,7 @@ function receberDoServidor(m) {
   if (m.tipo === 'removido') { S.erroInicio = 'Você saiu da mesa.'; return sairDaSala(); }
   if (m.tipo === 'estado') return receberEstado(m);
   if (m.tipo === 'erro') {
+    if (o.codigo && /não encontrada/i.test(m.mensagem)) { S.erroInicio = 'Essa sala fechou (o servidor reiniciou ou ficou parado). Crie outra.'; return sairDaSala(); }
     if (S.tela === 'mesa' && S.ui) { tocar('erro'); S.ui.aviso = m.mensagem; S.ui.erro = true; render(); return; }
     if (!o.codigo) {
       o.saindo = true; o.ws.close(); S.online = null;

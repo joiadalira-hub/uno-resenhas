@@ -78,14 +78,57 @@ const iconeSom = () => S.som
   : '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6M22 9l-5 6"/>';
 const botaoSom = () => `<button class="btn btn-icone botao-som ${CALL.ativa ? 'em-call' : ''}" id="som" aria-label="Sons e call" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconeSom()}</svg></button>`;
 // ---------- zoom: (−) e (+) aumentam ou diminuem a tela inteira, de 10 em 10% ----------
-const ZOOM = { valor: ler('ur-zoom', 1) };
+const ZOOM = { valor: ler('ur-zoom', 1), mao: ler('ur-tam-mao', 1), mesa: ler('ur-tam-mesa', 1) };
 function aplicarZoom() {
   const z = ZOOM.valor;
   app.style.zoom = z === 1 ? '' : String(z);
   // altura em px (que o zoom multiplica): a tela inteira continua cabendo, em qualquer navegador
   app.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
 }
-const botoesZoom = () => `<span class="zoom"><button class="btn btn-icone" id="zoom-menos" aria-label="Diminuir tela" ${ZOOM.valor <= 0.6 ? 'disabled' : ''}>−</button><button class="btn btn-icone" id="zoom-mais" aria-label="Aumentar tela" ${ZOOM.valor >= 1.6 ? 'disabled' : ''}>+</button></span>`;
+// um botão só (lupa) abre o painel: zoom da tela, tamanho das cartas da mão e das cartas da mesa
+const botoesZoom = () => `<button class="btn btn-icone" id="visual" aria-label="Zoom e tamanho das cartas" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg></button>`;
+const AJUSTES = [
+  ['valor', 'ur-zoom', 'Zoom da tela', 'Aumenta ou diminui tudo'],
+  ['mao', 'ur-tam-mao', 'Cartas da mão', 'Só as suas cartas'],
+  ['mesa', 'ur-tam-mesa', 'Cartas da mesa', 'Monte e pilha do meio'],
+];
+function abrirPainelVisual(botao) {
+  const velho = document.querySelector('.painel-visual');
+  document.querySelectorAll('.painel-som').forEach((x) => x.remove());
+  if (velho) return;
+  const r = botao.getBoundingClientRect();
+  const pn = document.createElement('div');
+  pn.className = 'painel-som painel-visual';
+  pn.setAttribute('role', 'dialog');
+  pn.setAttribute('aria-label', 'Zoom e tamanho das cartas');
+  pn.style.top = (r.bottom + 8) + 'px';
+  document.body.appendChild(pn);
+  desenharPainelVisual();
+  const w = pn.offsetWidth;
+  pn.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+  const fechar = (ev) => { if (!pn.contains(ev.target) && !ev.target.closest('#visual')) { pn.remove(); document.removeEventListener('pointerdown', fechar, true); } };
+  setTimeout(() => document.addEventListener('pointerdown', fechar, true), 0);
+}
+function desenharPainelVisual() {
+  const pn = document.querySelector('.painel-visual');
+  if (!pn) return;
+  pn.innerHTML = AJUSTES.map(([k, , nome, ajuda]) => `<div class="ps-linha"><span style="display:flex;flex-direction:column"><span class="ps-titulo">${nome}</span><span class="ajuda">${ajuda}</span></span>
+    <div class="passo"><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="-1" aria-label="Diminuir ${nome}" ${ZOOM[k] <= 0.6 ? 'disabled' : ''}>−</button><span style="min-width:52px;font-size:17px">${Math.round(ZOOM[k] * 100)}%</span><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="1" aria-label="Aumentar ${nome}" ${ZOOM[k] >= 1.6 ? 'disabled' : ''}>+</button></div></div>`).join('')
+    + '<button type="button" class="link" id="aj-padrao" style="align-self:center">Voltar ao padrão</button>';
+  pn.querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => mudarAjuste(b.dataset.aj, Number(b.dataset.d) * 0.1)));
+  pn.querySelector('#aj-padrao').onclick = () => { for (const [k, chave] of AJUSTES) { ZOOM[k] = 1; gravar(chave, 1); } aplicarZoom(); render(); desenharPainelVisual(); };
+}
+function mudarAjuste(k, d) {
+  const chave = AJUSTES.find((a) => a[0] === k)[1];
+  ZOOM[k] = Math.round(Math.min(1.6, Math.max(0.6, ZOOM[k] + d)) * 10) / 10;
+  gravar(chave, ZOOM[k]);
+  if (k === 'valor') aplicarZoom();
+  render();
+  desenharPainelVisual();
+  // o painel acompanha o botão (o zoom muda a posição dele)
+  const b = document.getElementById('visual'), pn = document.querySelector('.painel-visual');
+  if (b && pn) { const r = b.getBoundingClientRect(), w = pn.offsetWidth; pn.style.top = (r.bottom + 8) + 'px'; pn.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px'; }
+}
 // ---------- tela cheia: disponível em todas as telas (fica valendo ao trocar de tela) ----------
 const iconeTelaCheia = () => (document.fullscreenElement ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>');
 const botaoTelaCheia = () => (document.fullscreenEnabled ? `<button class="btn btn-icone" id="tela-cheia" aria-label="${document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconeTelaCheia()}</svg></button>` : '');
@@ -99,13 +142,12 @@ function ligarTelaCheia() {
 }
 function ligarZoom() {
   ligarTelaCheia();
-  const mudar = (d) => { ZOOM.valor = Math.round(Math.min(1.6, Math.max(0.6, ZOOM.valor + d)) * 10) / 10; gravar('ur-zoom', ZOOM.valor); aplicarZoom(); render(); };
-  const m = document.getElementById('zoom-menos'), p = document.getElementById('zoom-mais');
-  if (m) m.onclick = () => mudar(-0.1);
-  if (p) p.onclick = () => mudar(0.1);
+  const v = document.getElementById('visual');
+  if (v) v.onclick = (ev) => { ev.stopPropagation(); abrirPainelVisual(v); };
 }
 // ---------- painel de som: sons do jogo, call de voz e microfone ----------
 function abrirPainelSom(botao) {
+  document.querySelectorAll('.painel-visual').forEach((x) => x.remove());
   const velho = document.querySelector('.painel-som');
   if (velho) { velho.remove(); return; }
   const r = botao.getBoundingClientRect();
@@ -686,15 +728,15 @@ function telaMesa() {
   const comboDisponivel = vez && possiveis.some((p) => p.ids.length > 1);
   // Tamanho das cartas acompanha a tela (celular ou PC)
   const W = window.innerWidth / ZOOM.valor, H = window.innerHeight / ZOOM.valor;
-  const cw = Math.round(Math.max(84, Math.min(W * 0.25, H * 0.16, 150)));
-  const cwTopo = Math.round(Math.max(96, Math.min(W * 0.27, H * 0.16, 160)));
+  const cw = Math.round(Math.max(84, Math.min(W * 0.25, H * 0.16, 150)) * ZOOM.mao);
+  const cwTopo = Math.round(Math.max(96, Math.min(W * 0.27, H * 0.16, 160)) * ZOOM.mesa);
   const larguraMao = Math.min(W, 1100) - 40;
   const passoCarta = mao.length <= 1 ? cw : Math.max(cw * 0.3, Math.min(cw * 0.86, (larguraMao - cw) / (mao.length - 1)));
   const sobrepor = Math.round(passoCarta - cw);
   // Assentos em volta da mesa oval: da esquerda, por cima, até a direita (ordem de jogo)
   // Regra: os lugares (fotos) e a mesa só mudam se a tela mudar de tamanho ou alguém entrar/sair.
   // Nenhuma animação, painel ou botão mexe neles.
-  const chaveLayout = `${Math.round(W)}x${Math.round(H)}x${ZOOM.valor}x${rivais.map((j) => j.id).join(',')}`;
+  const chaveLayout = `${Math.round(W)}x${Math.round(H)}x${ZOOM.valor}x${ZOOM.mao}x${ZOOM.mesa}x${rivais.map((j) => j.id).join(',')}`;
   const fixo = S.layoutMesa && S.layoutMesa.chave === chaveLayout ? S.layoutMesa : null;
   const assentos = (fixo ? fixo.pos : posicoesAssentos(rivais.length)).map((pos, k) => ({ j: rivais[k], ...pos }));
   const vulneravelRival = e.vulneravel && e.vulneravel !== EU ? e.vulneravel : null;

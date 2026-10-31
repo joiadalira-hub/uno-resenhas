@@ -1,7 +1,7 @@
 // Uno Resenhas — guarda cartas, sons e ícones no celular.
 // Da segunda vez em diante o jogo abre sem baixar nada disso de novo.
 // Estratégia: mostra o que está guardado na hora e, por trás, confere se a arte mudou.
-const CACHE = 'uno-resenhas-v2'; // mude a versão quando trocar as artes das cartas
+const CACHE = 'uno-resenhas-v3'; // mude a versão quando trocar as artes das cartas
 const GUARDAR = /\/(cartas|sons)\/|\/icone-|manifest\.webmanifest$/;
 
 self.addEventListener('install', () => self.skipWaiting());

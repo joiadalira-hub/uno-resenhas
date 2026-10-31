@@ -40,8 +40,20 @@ function cantosIcone(icone, escala = 0.5) {
 const svg = (corpo) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${corpo}</svg>`;
 
 // ---------- ícones (centrados em 0,0) ----------
+// o "cara saltando" da arte clássica do Pular, contornado em traço fino (pular_contorno.json)
+const CONTORNO = JSON.parse(fs.readFileSync(path.join(__dirname, 'pular_contorno.json'), 'utf8'));
+function curvaSuave(pts) { // Catmull-Rom → Bézier: o contorno sai liso, sem quinas de polígono
+  const n = pts.length, P = (i) => pts[(i + n) % n];
+  let d = `M ${P(0)[0]} ${P(0)[1]}`;
+  for (let i = 0; i < n; i++) {
+    const [p0, p1, p2, p3] = [P(i - 1), P(i), P(i + 1), P(i + 2)];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C ${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0]} ${p2[1]}`;
+  }
+  return d + ' Z';
+}
 const ICONE = {
-  pular: (s = 13) => `<circle r="100" fill="none" stroke="#fff" stroke-width="${s}"/><line x1="-70" y1="70" x2="70" y2="-70" stroke="#fff" stroke-width="${s}"/>`,
+  pular: (s = 9) => `<path d="${curvaSuave(CONTORNO)}" fill="none" stroke="#fff" stroke-width="${s}" stroke-linejoin="round"/>`,
   // duas cartas: a de trás aparece só fora da da frente
   mais2: (s = 11) => `<defs><mask id="m2"><rect x="-200" y="-200" width="400" height="400" fill="#fff"/><rect x="-62" y="-14" width="66" height="96" rx="9" fill="#000" stroke="#000" stroke-width="${s * 2}"/></mask></defs>
     <rect x="-12" y="-82" width="66" height="96" rx="9" fill="none" stroke="#fff" stroke-width="${s}" mask="url(#m2)"/>
@@ -87,8 +99,8 @@ function carta(nome) {
   }
   if ((m = nome.match(/^(\w+)-(pular|mais2|reverso)$/))) {
     const [, cor, t] = m;
-    const canto = t === 'mais2' ? cantos('+2') : cantosIcone(ICONE[t](t === 'pular' ? 22 : 20));
-    return svg(fundo(COR[cor]) + canto + centro(`<g transform="scale(${t === 'mais2' ? 1.25 : t === 'reverso' ? 1.15 : 1.05})">${ICONE[t](t === 'reverso' ? 12 : undefined)}</g>`));
+    const canto = t === 'mais2' ? cantos('+2') : t === 'pular' ? cantosIcone(ICONE.pular(16), 0.36) : cantosIcone(ICONE[t](20));
+    return svg(fundo(COR[cor]) + canto + centro(`<g transform="scale(${t === 'mais2' ? 1.25 : t === 'reverso' ? 1.15 : 1.15})">${ICONE[t](t === 'reverso' ? 12 : undefined)}</g>`));
   }
   if ((m = nome.match(/^(coringa|mais5|ctrl)(?:-(\w+))?$/))) {
     const [, t, cor] = m;

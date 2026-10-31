@@ -86,7 +86,7 @@ function aplicarZoom() {
   app.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
 }
 // um botão só (lupa) abre o painel: zoom da tela, tamanho das cartas da mão e das cartas da mesa
-const botoesZoom = () => `<button class="btn btn-icone" id="visual" aria-label="Zoom e tamanho das cartas" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg></button>`;
+const botoesZoom = () => `<button class="btn btn-icone" id="visual" aria-label="Deck, zoom e tamanho das cartas" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg></button>`;
 const AJUSTES = [
   ['valor', 'ur-zoom', 'Zoom da tela', 'Aumenta ou diminui tudo'],
   ['mao', 'ur-tam-mao', 'Cartas da mão', 'Só as suas cartas'],
@@ -112,10 +112,10 @@ function abrirPainelVisual(botao) {
 function desenharPainelVisual() {
   const pn = document.querySelector('.painel-visual');
   if (!pn) return;
-  pn.innerHTML = AJUSTES.map(([k, , nome, ajuda]) => `<div class="ps-linha"><span style="display:flex;flex-direction:column"><span class="ps-titulo">${nome}</span><span class="ajuda">${ajuda}</span></span>
+  // o deck vem primeiro: é a escolha que mais se procura aqui dentro da mesa
+  pn.innerHTML = `<span class="ps-titulo">Deck das cartas</span>${htmlEscolhaDeck()}<div class="ps-sep"></div>` + AJUSTES.map(([k, , nome, ajuda]) => `<div class="ps-linha"><span style="display:flex;flex-direction:column"><span class="ps-titulo">${nome}</span><span class="ajuda">${ajuda}</span></span>
     <div class="passo"><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="-1" aria-label="Diminuir ${nome}" ${ZOOM[k] <= 0.6 ? 'disabled' : ''}>−</button><span style="min-width:52px;font-size:17px">${Math.round(ZOOM[k] * 100)}%</span><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="1" aria-label="Aumentar ${nome}" ${ZOOM[k] >= 1.6 ? 'disabled' : ''}>+</button></div></div>`).join('')
-    + '<button type="button" class="link" id="aj-padrao" style="align-self:center">Voltar ao padrão</button>'
-    + `<div class="ps-sep"></div><span class="ps-titulo">Deck das cartas</span>${htmlEscolhaDeck()}`;
+    + '<button type="button" class="link" id="aj-padrao" style="align-self:center">Voltar ao padrão</button>';
   ligarEscolhaDeck(pn);
   pn.querySelectorAll('[data-deck]').forEach((b) => b.addEventListener('click', () => setTimeout(desenharPainelVisual, 0)));
   pn.querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => mudarAjuste(b.dataset.aj, Number(b.dataset.d) * 0.1)));

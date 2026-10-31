@@ -7,7 +7,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomBytes, randomInt } from 'node:crypto';
+import { randomBytes, randomInt, createHash } from 'node:crypto';
 import { aceitarUpgrade } from './ws.js';
 import { novaPartida, aplicar, visaoDe, resolverSequencia, removerJogadores, adicionarJogador } from '../motor/regras.js';
 import { escolherAcao } from '../motor/bot.js';
@@ -43,7 +43,11 @@ const servidor = http.createServer((req, res) => {
     // a página do jogo ganha o cabeçalho de site: tela de celular, ícone de app e base "/"
     // (a base faz as cartas carregarem também nos links de sala, /s/CODIGO)
     if (arquivo.endsWith('index.html')) dados = Buffer.concat([Buffer.from(CABECALHO), dados]);
-    res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': ext === '.html' || arquivo.endsWith('sw.js') ? 'no-cache' : 'public, max-age=86400' });
+    // tudo é conferido com o servidor (no-cache + ETag): arte nova de carta aparece na hora,
+    // e o que não mudou volta como "304" (sem baixar de novo)
+    const etag = '"' + createHash('md5').update(dados).digest('hex').slice(0, 16) + '"';
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, { etag }); return res.end(); }
+    res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': 'no-cache', etag });
     res.end(dados);
   });
 });

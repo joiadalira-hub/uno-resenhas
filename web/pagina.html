@@ -157,7 +157,8 @@ body.tem-verso .monte b { display: none; }
 @keyframes pegou-pulsa { 50% { scale: 1.08; } }
 .fichas { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; }
 .ficha { height: 30px; padding: 0 10px; border-radius: 9px; background: var(--chao); display: flex; align-items: center; font-size: 13px; font-weight: 700; }
-.mao-wrap { flex: none; box-sizing: border-box; height: calc(var(--cw, 76px) * (1002 / 650) + var(--cw, 76px) * 0.24 + 18px); /* altura fixa: a barra de rolagem não empurra a mesa */ overflow-x: auto; overflow-y: visible; padding: calc(var(--cw, 76px) * 0.24) 4px 4px; margin: -10px -4px 0; scrollbar-width: thin; }
+.mao-wrap { flex: none; box-sizing: border-box; height: calc(var(--cw, 76px) * (1002 / 650) + var(--cw, 76px) * 0.24 + 18px); /* altura fixa: a barra de rolagem não empurra a mesa */ overflow-x: auto; overflow-y: visible; padding: calc(var(--cw, 76px) * 0.24) 4px 4px; margin: -10px -4px 0; scrollbar-width: none; }
+.mao-wrap::-webkit-scrollbar { display: none; } /* rola com o dedo/mouse, sem barra aparecendo */
 .mao { display: flex; width: max-content; min-width: 100%; justify-content: center; }
 .carta { position: relative; flex: none; width: var(--cw, 76px); padding: 0; border: 0; background: none; cursor: pointer; transition: transform .12s; border-radius: 9px; }
 .carta + .carta { margin-left: var(--sobrepor, -34px); }
@@ -193,6 +194,9 @@ body.tem-verso .monte b { display: none; }
 /* combo: no fim as cartas voltam uma a uma para a pilha e o escuro sai junto */
 .palco.recolhe .palco-fundo, .palco.recolhe .anim-cab { opacity: 0; transition: opacity .3s; }
 .palco.recolhe .combo-carta { transition: none; }
+.palco.recolhe .reverso-setas { opacity: 0; transition: opacity .3s; }
+/* +N de compra por efeito */
+.compra-show .anim-titulo { color: #fff; -webkit-text-stroke: 3px #3A0805; text-shadow: 0 7px 0 var(--perigo), 0 14px 30px rgba(0,0,0,.75); font-size: clamp(64px, 14vw, 130px); }
 /* cabeçalho: foto/avatar, nome e título */
 .anim-cab { position: relative; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
 .anim-avatar { width: 84px; height: 84px; animation: vit-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
@@ -209,7 +213,7 @@ body.tem-verso .monte b { display: none; }
 @keyframes pop { from { scale: .2; rotate: -8deg; opacity: 0; } }
 .efeito-col { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
 .efeito-cartas { position: relative; flex: none; width: 100%; height: calc(var(--cw) * 1.54 + 24px); }
-.combo-carta { position: absolute; left: 50%; top: 50%; width: var(--cw); margin-left: calc(var(--cw) / -2); margin-top: calc(var(--cw) * -0.77); transform: rotate(calc(var(--r) * .4)); animation: cai .21s cubic-bezier(.3,1.35,.5,1) backwards; animation-delay: calc(600ms + var(--i) * 225ms); transition: transform .45s cubic-bezier(.3,1.25,.4,1); }
+.combo-carta { position: absolute; left: 50%; top: 50%; width: var(--cw); margin-left: calc(var(--cw) / -2); margin-top: calc(var(--cw) * -0.77); transform: rotate(calc(var(--r) * .4)); animation: cai .21s cubic-bezier(.3,1.35,.5,1) backwards; animation-delay: calc(450ms + var(--i) * 225ms); transition: transform .45s cubic-bezier(.3,1.25,.4,1); }
 .combo-carta img { width: 100%; display: block; border-radius: 10px; box-shadow: 0 10px 24px rgba(0,0,0,.6); }
 @keyframes cai { from { opacity: 0; transform: translateY(-160px) scale(1.4) rotate(-14deg); } }
 .palco.espalha .combo-carta { transform: translate(var(--x), var(--y)) rotate(var(--r)); }
@@ -249,7 +253,7 @@ body.tem-verso .monte b { display: none; }
 @keyframes nove-pulsa { 50% { transform: scale(1.08); box-shadow: 0 0 0 18px rgba(242,69,61,.15), 0 14px 30px rgba(0,0,0,.6); } }
 .assento.apertou9 .avatar::after { content: "9 ✓"; position: absolute; left: -12px; top: -6px; padding: 2px 6px; border-radius: 8px; background: var(--ok); color: #06210F; font: 800 12px var(--corpo); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 /* Carta voando do monte até quem comprou */
-.voo { position: fixed; z-index: 14; pointer-events: none; border-radius: 10px; box-shadow: 0 10px 22px rgba(0,0,0,.55); display: grid; place-items: center; transform-origin: 50% 50%; }
+.voo { position: fixed; z-index: 16; pointer-events: none; border-radius: 10px; box-shadow: 0 10px 22px rgba(0,0,0,.55); display: grid; place-items: center; transform-origin: 50% 50%; }
 .voo b { font: 800 22px var(--display); color: var(--destaque); }
 body.tem-verso .voo b { display: none; }
 /* Animação do Reverso */

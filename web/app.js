@@ -484,7 +484,7 @@ function telaMesa() {
           <path d="M50 96 A46 46 0 0 1 4 50" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" marker-end="url(#ponta)"/></svg>
         <div class="pilhas">
           <button class="monte verso" id="monte" aria-label="Comprar do monte, ${v.monte} cartas" ${vez && !e.comprou ? '' : 'disabled'}><b>UR</b></button>
-          ${htmlTopo(v, ui.ultimaCarta !== v.cartaDoTopo.id)}
+          ${ui.topoSegurado ? htmlTopo(ui.topoSegurado, false) : htmlTopo(v, ui.ultimaCarta !== v.cartaDoTopo.id)}
         </div>
       </div>
       <div class="pilulas">
@@ -705,7 +705,8 @@ function agir(acao) {
 
 // Como a mesa estava antes da jogada (para animar as diferenças)
 function fotoAntes() {
-  return { sentido: S.e.sentido, pendente: !!S.e.compraPendente, maos: Object.fromEntries(S.e.jogadores.map((j) => [j.id, j.mao.length])), minhas: new Set(minhaMao().map((c) => c.id)) };
+  const topo = { cartaDoTopo: S.e.descarte[S.e.descarte.length - 1], topo: S.e.topo, corAtual: S.e.corAtual };
+  return { topo, sentido: S.e.sentido, pendente: !!S.e.compraPendente, maos: Object.fromEntries(S.e.jogadores.map((j) => [j.id, j.mao.length])), minhas: new Set(minhaMao().map((c) => c.id)) };
 }
 
 // Efeitos de uma jogada já aplicada (local ou vinda do servidor): aviso, sons, animações, compras
@@ -715,29 +716,21 @@ function posAcao(acao, r, jogada, antes) {
   const sentidoAntes = antes.sentido, maosAntes = antes.maos, minhasAntes = antes.minhas;
   ui.aviso = descrever(acao, r); ui.erro = false;
   somDaAcao(acao, r, jogada, combo, antes);
-  if (combo) {
-    ui.comboAte = Date.now() + mostrarCombo(acao.jogador, itensDaJogada(combo));
-    ui.ultimaCarta = S.e.descarte[S.e.descarte.length - 1].id; // o topo já aparece pronto, sem repetir animação
-  }
-  if (S.e.sentido !== sentidoAntes) {
-    // Reverso: entra depois do combo (se houver) ou logo depois da carta cair na pilha
-    const atraso = Math.max(350, (ui.comboAte || 0) - Date.now());
-    const sentido = S.e.sentido;
-    const quem = acao.jogador;
-    const itensRev = jogada ? itensDaJogada(jogada) : [];
-    setTimeout(() => { if (S.e) mostrarReverso(quem, sentido, itensRev); }, atraso);
-    ui.comboAte = Date.now() + atraso + DURACAO_REVERSO;
-  }
-  if (jogada && S.e.fase === 'jogando' && jogada.efetivas[jogada.efetivas.length - 1].tipo === 'pular') {
-    // Pular: a vez salta por cima de cada jogador bloqueado até o próximo
+  // Combo, Pular e Reverso: uma animação só; as cartas só vão para a pilha no fim dela
+  let efeito = null;
+  if (jogada && S.e.sentido !== sentidoAntes) efeito = { tipo: 'reverso', sentido: S.e.sentido };
+  else if (jogada && S.e.fase === 'jogando' && jogada.efetivas[jogada.efetivas.length - 1].tipo === 'pular') {
     const N = S.e.jogadores.length, q = jogada.fisicas.length;
     const pulados = Array.from({ length: q }, (_, k) => S.e.jogadores[(((jogada.indice + S.e.sentido * (k + 1)) % N) + N) % N].id);
-    const destino = S.e.jogadores[S.e.vez].id;
-    const atraso = Math.max(350, (ui.comboAte || 0) - Date.now());
-    const dur = duracaoPulo(q);
-    const itensPulo = itensDaJogada(jogada);
-    setTimeout(() => { if (S.e) mostrarPulo(acao.jogador, pulados, destino, itensPulo); }, atraso);
-    ui.comboAte = Date.now() + atraso + dur;
+    efeito = { tipo: 'pulo', pulados, destino: S.e.jogadores[S.e.vez].id };
+  }
+  if (jogada && (combo || efeito)) {
+    const marca = (ui.marcaTopo || 0) + 1;
+    ui.marcaTopo = marca;
+    ui.topoSegurado = antes.topo; // a pilha continua mostrando a carta de antes
+    ui.ultimaCarta = S.e.descarte[S.e.descarte.length - 1].id;
+    const soltar = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; if (S.tela === 'mesa') render(); } };
+    ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itensDaJogada(jogada), efeito, soltar);
   }
   // Zero que troca as mãos: TROCOU! com os dois jogadores e os leques cruzando a mesa
   const troca = (r.eventos || []).find((ev) => ev.tipo === 'troca');
@@ -770,6 +763,16 @@ function posAcao(acao, r, jogada, antes) {
         if (j.id === EU) { ui.pendentes = ui.pendentes || new Set(); for (const c of j.mao) if (!minhasAntes.has(c.id)) ui.pendentes.add(c.id); }
         else { ui.mostrado = ui.mostrado || {}; ui.mostrado[j.id] = Math.min(maosAntes[j.id], ui.mostrado[j.id] ?? Infinity); }
       }
+    }
+  }
+  // +2, +5, desafio e "Pegou!": +N grande com quem está comprando
+  const forcada = (acao.tipo === 'comprar' && antes.pendente) || acao.tipo === 'pegou' || acao.tipo === 'desafiar';
+  if (forcada && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (const [id, d] of compras) {
+      const sub = acao.tipo === 'pegou' ? 'Não disse Última!' : acao.tipo === 'desafiar' ? (r.resultado === 'ilegal' ? 'Desafio certo: o +5 era ilegal' : 'Desafio errado: +2 de castigo') : `Comprou ${d} ${d === 1 ? 'carta' : 'cartas'}`;
+      const dur = Math.max(1500, duracaoCompra(d) + 400);
+      mostrarCompraForcada(id, d, sub, dur);
+      ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + dur);
     }
   }
   depoisDeMudar();
@@ -861,38 +864,109 @@ function montarEfeito(area, r, idJog, titulo, sub, itens) {
       <img src="${it.src}" alt="">${it.rotulo ? `<span class="combo-rotulo">${esc(it.rotulo)}</span>` : ''}</div>`;
   }).join('') + '</div></div>';
 }
-function mostrarCombo(idJog, itens) {
+// Uma jogada com animação, do começo ao fim, num palco só:
+// título (COMBO! ou o efeito) → cartas caem → efeito (PULOU!/REVERSO!) → cartas voltam uma a uma para a pilha.
+// A pilha só troca de carta quando a última pousa nela.
+function duracoesJogada(n, efeito, q) {
+  const tEspalha = 450 + n * 225 + 150;
+  const tB = efeito ? tEspalha + 350 : tEspalha;
+  const durB = !efeito ? 700 : efeito.tipo === 'reverso' ? 1500 : (q + 1) * SALTO + 350;
+  const tC = tB + durB;
+  const tFim = tC + (n - 1) * 110 + 260;
+  return { tEspalha, tB, tC, tFim, total: tFim + 350 };
+}
+const SETAS_REVERSO = `<div class="reverso-setas"><svg viewBox="0 0 100 100" aria-hidden="true">
+      <defs><marker id="ponta-rev" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <path d="M50 8 A42 42 0 0 1 92 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/>
+      <path d="M50 92 A42 42 0 0 1 8 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/></svg></div>`;
+function mostrarJogada(idJog, itens, efeito, aoPousar) {
   if (comboAtivo) comboAtivo.remove();
-  const n = itens.length;
-  const p = criarPalco('combo-show', `${nomeJog(idJog)} jogou um combo de ${n} cartas`);
-  if (!p) return 0;
+  const n = itens.length, combo = n > 1;
+  const nomeEf = efeito ? (efeito.tipo === 'reverso' ? 'REVERSO!' : 'PULOU!') : '';
+  const subEf = !efeito ? '' : efeito.tipo === 'reverso' ? `Agora ${efeito.sentido === 1 ? 'horário ↻' : 'anti-horário ↺'}` : efeito.pulados.length > 1 ? `${efeito.pulados.length} jogadores bloqueados` : '';
+  const p = criarPalco('combo-show', combo ? `${nomeJog(idJog)} jogou um combo de ${n} cartas` : `${nomeJog(idJog)}: ${nomeEf}`);
+  if (!p) { aoPousar(); return 0; }
   const { palco, area, r } = p;
-  montarEfeito(area, r, idJog, 'COMBO!', '', itens);
-  tocar('combo');
-  const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // cada carta que cai faz o som de "carta" (na hora em que encosta)
-  if (!reduzido) itens.forEach((_, i) => tocarDepois('carta', 600 + i * 225));
+  montarEfeito(area, r, idJog, combo ? 'COMBO!' : nomeEf, combo ? '' : subEf, itens);
   comboAtivo = palco;
+  const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (combo) tocar('combo');
   if (reduzido) {
-    setTimeout(() => palco.classList.add('sai'), 1800);
+    if (efeito) efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf);
+    setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, 1800);
     setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, 2150);
     return 2150;
   }
-  // cai (rápido) → abre em escada → recolhe uma a uma na pilha, de baixo para cima
-  const tEspalha = 600 + n * 225 + 150;
-  const tRecolhe = tEspalha + 700;
-  const PASSO = 110, VOO = 260;
-  const total = tRecolhe + (n - 1) * PASSO + VOO;
-  setTimeout(() => palco.classList.add('espalha'), tEspalha);
-  setTimeout(() => recolherNaPilha(palco, PASSO, VOO), tRecolhe);
-  setTimeout(() => palco.classList.add('sai'), total);
-  setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, total + 350);
-  return total + 350;
+  if (combo) itens.forEach((_, i) => tocarDepois('carta', 450 + i * 225)); // cada carta que cai faz o som
+  const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
+  const d = duracoesJogada(n, efeito, q);
+  setTimeout(() => palco.classList.add('espalha'), d.tEspalha);
+  if (efeito) setTimeout(() => { if (palco.isConnected) efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf); }, d.tB);
+  setTimeout(() => { if (palco.isConnected) recolherNaPilha(palco, 110, 260); }, d.tC);
+  setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, d.tFim);
+  setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, d.total);
+  return d.total;
+}
+// O efeito da jogada, no mesmo palco: as setas do Reverso ou a bolinha da vez saltando no Pular
+function efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf) {
+  if (combo) { // o título troca de COMBO! para o efeito
+    const t = area.querySelector('.anim-titulo');
+    if (t) { const novo = t.cloneNode(); novo.textContent = nomeEf; t.replaceWith(novo); }
+    if (subEf) area.querySelector('.anim-cab').insertAdjacentHTML('beforeend', `<span class="anim-sub">${esc(subEf)}</span>`);
+  }
+  if (efeito.tipo === 'reverso') {
+    palco.classList.add('reverso-show', efeito.sentido === 1 ? 'horario' : 'anti');
+    area.style.setProperty('--cor', VAR_COR[S.e.corAtual]);
+    area.querySelector('.efeito-cartas').insertAdjacentHTML('beforeend', SETAS_REVERSO);
+    tocar('reverso');
+    GIRO.turboAte = performance.now() + 1400; // a seta da mesa dá um giro rápido no sentido novo
+    return;
+  }
+  tocar('pular');
+  const { pulados, destino } = efeito;
+  const pontos = [idJog, ...pulados, destino].map(centroDoJogador);
+  if (pontos.some((x) => !x)) return;
+  // carimbos de bloqueio sobre quem foi pulado
+  pulados.forEach((id, k) => {
+    const c = pontos[k + 1];
+    const selo = document.createElement('div');
+    selo.className = 'pulo-bloqueio';
+    selo.style.left = c.x + 'px'; selo.style.top = c.y + 'px';
+    selo.style.animationDelay = ((k + 1) * SALTO - 120) + 'ms';
+    palco.appendChild(selo);
+  });
+  // a bolinha da vez saltando em arco de um jogador ao outro
+  const bola = document.createElement('div');
+  bola.className = 'pulo-bola';
+  bola.textContent = 'VEZ';
+  palco.appendChild(bola);
+  const quadros = [];
+  pontos.forEach((pt, k) => {
+    if (k === 0) { quadros.push({ transform: `translate(${pt.x}px, ${pt.y}px) scale(.4)`, opacity: 0 }); return; }
+    const a = pontos[k - 1];
+    const alto = Math.max(70, Math.hypot(pt.x - a.x, pt.y - a.y) * 0.45);
+    quadros.push({ transform: `translate(${(a.x + pt.x) / 2}px, ${(a.y + pt.y) / 2 - alto}px) scale(1.15)`, opacity: 1 });
+    quadros.push({ transform: `translate(${pt.x}px, ${pt.y}px) scale(${k === pontos.length - 1 ? 1.35 : 0.9})`, opacity: 1 });
+  });
+  quadros.splice(1, 0, { transform: `translate(${pontos[0].x}px, ${pontos[0].y}px) scale(1)`, opacity: 1 });
+  quadros.forEach((f, i) => { f.offset = i / (quadros.length - 1); });
+  bola.animate(quadros, { duration: (pulados.length + 1) * SALTO + 250, easing: 'ease-in-out', fill: 'forwards' });
+}
+
+// ---------- compra por efeito (+2, +5, desafio, "Pegou!"): +N com a foto de quem compra ----------
+function mostrarCompraForcada(id, n, sub, dur) {
+  const p = criarPalco('compra-show', `${nomeJog(id)} comprou ${n} ${n === 1 ? 'carta' : 'cartas'}`);
+  if (!p) return;
+  const { palco, area } = p;
+  area.innerHTML = `<div class="efeito-col">${htmlCabecalho(id, `+${n}`, sub)}</div>`;
+  setTimeout(() => palco.classList.add('sai'), dur - 350);
+  setTimeout(() => palco.remove(), dur);
 }
 function recolherNaPilha(palco, passo, voo) {
   const pilha = document.querySelector('.topo-pilha');
   if (!pilha || !palco.isConnected) return;
   palco.classList.add('recolhe');
+  palco.querySelectorAll('.pulo-bola, .pulo-bloqueio').forEach((x) => x.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' }));
   const alvo = pilha.getBoundingClientRect();
   const ax = alvo.left + alvo.width / 2, ay = alvo.top + alvo.height / 2;
   palco.querySelectorAll('.combo-carta').forEach((el, i) => {
@@ -1001,28 +1075,6 @@ function mostrarVitoria(depois) {
   setTimeout(() => div.remove(), acabou ? 3700 : 3100);
 }
 
-// ---------- animação do Reverso ----------
-const DURACAO_REVERSO = 1850;
-let reversoAtivo = null;
-function mostrarReverso(idJog, sentido, itens) {
-  if (reversoAtivo) reversoAtivo.remove();
-  const p = criarPalco('reverso-show rapida ' + (sentido === 1 ? 'horario' : 'anti'), `${nomeJog(idJog)} inverteu o sentido do jogo`);
-  if (!p) return;
-  const { palco, area, r } = p;
-  tocar('reverso');
-  montarEfeito(area, r, idJog, 'REVERSO!', `Agora ${sentido === 1 ? 'horário ↻' : 'anti-horário ↺'}`, itens);
-  area.style.setProperty('--cor', VAR_COR[S.e.corAtual]);
-  area.querySelector('.efeito-cartas').insertAdjacentHTML('beforeend', `<div class="reverso-setas"><svg viewBox="0 0 100 100" aria-hidden="true">
-      <defs><marker id="ponta-rev" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
-      <path d="M50 8 A42 42 0 0 1 92 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/>
-      <path d="M50 92 A42 42 0 0 1 8 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/></svg></div>`);
-  reversoAtivo = palco;
-  GIRO.turboAte = performance.now() + 1400; // a seta da mesa dá um giro rápido no sentido novo
-  setTimeout(() => palco.classList.add('espalha'), 150 + itens.length * 120 + 150);
-  setTimeout(() => palco.classList.add('sai'), DURACAO_REVERSO - 350);
-  setTimeout(() => { palco.remove(); if (reversoAtivo === palco) reversoAtivo = null; }, DURACAO_REVERSO);
-}
-
 // ---------- animação do zero que troca as mãos ----------
 const DURACAO_TROCA = 1900;
 function pessoaAnim(id) {
@@ -1073,54 +1125,11 @@ function mostrarUltima(id, disse) {
 
 // ---------- animação do Pular: a vez salta por cima dos bloqueados ----------
 const SALTO = 520;
-const duracaoPulo = (q) => 700 + (q + 1) * SALTO + 450;
-let puloAtivo = null;
 function centroDoJogador(id) {
   const el = id === EU ? document.querySelector('.eu-canto .avatar') : document.querySelector(`.assento[data-id="${id}"] .avatar`);
   if (!el) return null;
   const b = el.getBoundingClientRect();
   return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-}
-function mostrarPulo(idJog, pulados, destino, itens) {
-  if (puloAtivo) puloAtivo.remove();
-  const q = pulados.length;
-  const p = criarPalco('pulo-show rapida', `${nomeJog(idJog)} pulou ${q} ${q === 1 ? 'jogador' : 'jogadores'}`);
-  if (!p) return;
-  const { palco, area, r } = p;
-  tocar('pular');
-  montarEfeito(area, r, idJog, 'PULOU!', q > 1 ? `${q} jogadores bloqueados` : '', itens || []);
-  setTimeout(() => palco.classList.add('espalha'), 150 + (itens || []).length * 120 + 150);
-  puloAtivo = palco;
-  const pontos = [idJog, ...pulados, destino].map(centroDoJogador);
-  if (pontos.some((x) => !x)) { setTimeout(() => palco.remove(), 1500); return; }
-  // carimbos de bloqueio sobre quem foi pulado
-  pulados.forEach((id, k) => {
-    const c = pontos[k + 1];
-    const selo = document.createElement('div');
-    selo.className = 'pulo-bloqueio';
-    selo.style.left = c.x + 'px'; selo.style.top = c.y + 'px';
-    selo.style.animationDelay = (700 + (k + 1) * SALTO - 120) + 'ms';
-    palco.appendChild(selo);
-  });
-  // a bolinha da vez saltando em arco de um jogador ao outro
-  const bola = document.createElement('div');
-  bola.className = 'pulo-bola';
-  bola.textContent = 'VEZ';
-  palco.appendChild(bola);
-  const quadros = [];
-  pontos.forEach((pt, k) => {
-    if (k === 0) { quadros.push({ transform: `translate(${pt.x}px, ${pt.y}px) scale(.4)`, opacity: 0 }); return; }
-    const a = pontos[k - 1];
-    const alto = Math.max(70, Math.hypot(pt.x - a.x, pt.y - a.y) * 0.45);
-    quadros.push({ transform: `translate(${(a.x + pt.x) / 2}px, ${(a.y + pt.y) / 2 - alto}px) scale(1.15)`, opacity: 1 });
-    quadros.push({ transform: `translate(${pt.x}px, ${pt.y}px) scale(${k === pontos.length - 1 ? 1.35 : 0.9})`, opacity: 1 });
-  });
-  quadros.splice(1, 0, { transform: `translate(${pontos[0].x}px, ${pontos[0].y}px) scale(1)`, opacity: 1 });
-  const total = quadros.length;
-  quadros.forEach((f, i) => { f.offset = i / (total - 1); });
-  bola.animate(quadros, { duration: (q + 1) * SALTO + 250, delay: 450, easing: 'ease-in-out', fill: 'forwards' });
-  setTimeout(() => palco.classList.add('sai'), duracaoPulo(q) - 350);
-  setTimeout(() => { palco.remove(); if (puloAtivo === palco) puloAtivo = null; }, duracaoPulo(q));
 }
 
 let timerBot = null, timerRelogio = null, timerPegou = null;

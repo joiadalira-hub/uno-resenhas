@@ -235,11 +235,16 @@ class Sala {
     let t = 0;
     const { jogada, r } = evento;
     const n = jogada ? jogada.fisicas.length : 0;
-    if (n > 1) t = 600 + n * 225 + 150 + 700 + (n - 1) * 110 + 260 + 350; // cai, abre e recolhe na pilha
-    if (evento.reverso) t = Math.max(350, t) + 1850;
+    // combo / Pular / Reverso: um palco só (cai → efeito → recolhe na pilha), igual ao celular
+    const ultEf = jogada ? jogada.efetivas[n - 1] : null;
+    const efeito = evento.reverso ? 'reverso' : jogada && this.e.fase === 'jogando' && ultEf.tipo === 'pular' ? 'pulo' : null;
+    if (jogada && (n > 1 || efeito)) {
+      const tEspalha = 450 + n * 225 + 150;
+      const tB = efeito ? tEspalha + 350 : tEspalha;
+      const durB = !efeito ? 700 : efeito === 'reverso' ? 1500 : (n + 1) * 520 + 350;
+      t = tB + durB + (n - 1) * 110 + 260 + 350;
+    }
     if (jogada && this.e.fase === 'jogando') {
-      const ult = jogada.efetivas[jogada.efetivas.length - 1];
-      if (ult.tipo === 'pular') t = Math.max(350, t) + 700 + (jogada.fisicas.length + 1) * 520 + 450;
       const fis = jogada.fisicas[jogada.fisicas.length - 1];
       if (jogada.fisicas.length === 1 && (fis.tipo === 'coringa' || fis.tipo === '+5' || fis.tipo === 'ctrl')) t = Math.max(t, 1100);
       const troca = (r.eventos || []).some((ev) => ev.tipo === 'troca');
@@ -250,8 +255,11 @@ class Sala {
     const compradas = r && r.compradas ? r.compradas.length : 0;
     if (compradas) {
       const intervalo = compradas <= 2 ? 260 : Math.max(55, Math.min(220, 1600 / compradas));
-      t = Math.max(t, (compradas - 1) * intervalo + (compradas > 6 ? 330 : 460));
+      const voo = (compradas - 1) * intervalo + (compradas > 6 ? 330 : 460);
+      const forcada = evento.acao && (evento.acao.tipo === 'pegou' || (evento.acao.tipo === 'comprar' && r.perdeuVez));
+      t = Math.max(t, forcada ? Math.max(1500, voo + 400) : voo); // +N na tela de todos
     }
+    if (evento.acao && evento.acao.tipo === 'desafiar') t = Math.max(t, 2000);
     return t;
   }
 

@@ -86,7 +86,19 @@ function aplicarZoom() {
   app.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
 }
 const botoesZoom = () => `<span class="zoom"><button class="btn btn-icone" id="zoom-menos" aria-label="Diminuir tela" ${ZOOM.valor <= 0.6 ? 'disabled' : ''}>−</button><button class="btn btn-icone" id="zoom-mais" aria-label="Aumentar tela" ${ZOOM.valor >= 1.6 ? 'disabled' : ''}>+</button></span>`;
+// ---------- tela cheia: disponível em todas as telas (fica valendo ao trocar de tela) ----------
+const iconeTelaCheia = () => (document.fullscreenElement ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>');
+const botaoTelaCheia = () => (document.fullscreenEnabled ? `<button class="btn btn-icone" id="tela-cheia" aria-label="${document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconeTelaCheia()}</svg></button>` : '');
+function ligarTelaCheia() {
+  const b = document.getElementById('tela-cheia');
+  if (!b) return;
+  b.onclick = () => {
+    const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    Promise.resolve(p).catch(() => mostrarToast('Este navegador não deixou abrir em tela cheia', 3500));
+  };
+}
 function ligarZoom() {
+  ligarTelaCheia();
   const mudar = (d) => { ZOOM.valor = Math.round(Math.min(1.6, Math.max(0.6, ZOOM.valor + d)) * 10) / 10; gravar('ur-zoom', ZOOM.valor); aplicarZoom(); render(); };
   const m = document.getElementById('zoom-menos'), p = document.getElementById('zoom-mais');
   if (m) m.onclick = () => mudar(-0.1);
@@ -392,7 +404,7 @@ function render() {
 function telaInicio() {
   app.innerHTML = `
   <main class="tela" style="justify-content:space-between;position:relative">
-    <div style="position:absolute;top:12px;right:0;z-index:2;display:flex;gap:6px">${botoesZoom()}${botaoSom()}</div>
+    <div style="position:absolute;top:12px;right:0;z-index:2;display:flex;gap:6px">${botoesZoom()}${botaoSom()}${botaoTelaCheia()}</div>
     <div style="position:relative;height:220px;flex:none" aria-hidden="true">
       <img src="cartas/roxo-0.webp" alt="" style="position:absolute;left:calc(50% - 128px);top:22px;width:100px;transform:rotate(-16deg);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
       <img src="cartas/ctrl.webp" alt="" style="position:absolute;left:calc(50% - 50px);top:0;width:100px;border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
@@ -480,6 +492,7 @@ function telaCriar() {
     <div class="linha" style="justify-content:flex-start">
       <button class="btn btn-icone" id="voltar" aria-label="Voltar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <h1 style="font-size:28px">${online ? 'Criar sala online' : 'Criar sala de treino'}</h1>
+      <span style="margin-left:auto">${botaoTelaCheia()}</span>
     </div>
     ${online ? `<section class="bloco">
       <h2 class="rotulo">Sala</h2>
@@ -529,6 +542,7 @@ function telaCriar() {
     const t = app.querySelector('.tela'); if (t) t.scrollTop = y;
   };
   document.getElementById('voltar').onclick = () => { S.tela = 'inicio'; render(); };
+  ligarTelaCheia();
   document.getElementById('menos').onclick = () => { c.lugares = Math.max(2, c.lugares - 1); salvar(); };
   document.getElementById('mais').onclick = () => { c.lugares = Math.min(10, c.lugares + 1); salvar(); };
   app.querySelectorAll('[data-fim]').forEach((b) => (b.onclick = () => { c.fimModo = b.dataset.fim; c.fimValor = c.fimModo === 'rodadas' ? 5 : 50; salvar(); }));
@@ -701,7 +715,7 @@ function telaMesa() {
       <span style="display:flex;gap:6px">
         ${botoesZoom()}
         ${botaoSom()}
-        ${document.fullscreenEnabled ? `<button class="btn btn-icone" id="tela-cheia" aria-label="${document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${document.fullscreenElement ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'}</svg></button>` : ''}
+        ${botaoTelaCheia()}
         <span class="relogio ${vez && restam !== null ? (restam <= 5 ? 'urgente' : 'ativo') : ''}" id="relogio" aria-live="off">${vez && restam !== null ? restam + ' s' : '—'}</span>
       </span>
     </div>
@@ -799,10 +813,6 @@ function ligarMesa() {
   if ($('pegou')) $('pegou').onclick = () => agir({ tipo: 'pegou', jogador: EU, alvo: S.e.vulneravel });
   if ($('apertar9')) $('apertar9').onclick = () => agir({ tipo: 'apertar9', jogador: EU });
   ligarBotaoSom();
-  if ($('tela-cheia')) $('tela-cheia').onclick = () => {
-    const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-    Promise.resolve(p).catch(() => { S.ui.aviso = 'Este navegador não deixou abrir em tela cheia'; S.ui.erro = true; render(); });
-  };
   app.querySelectorAll('[data-carta]').forEach((b) => (b.onclick = () => tocarCarta(b.dataset.carta)));
   ligarModal();
 }
@@ -2133,6 +2143,7 @@ function telaEntrar() {
     <div class="linha" style="justify-content:flex-start">
       <button class="btn btn-icone" id="voltar" aria-label="Voltar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <h1 style="font-size:28px">Entrar na sala</h1>
+      <span style="margin-left:auto">${botaoTelaCheia()}</span>
     </div>
     <div class="bloco" style="align-items:center;text-align:center">
       <span class="rotulo">Sala</span>
@@ -2152,6 +2163,7 @@ function telaEntrar() {
     </form>
   </main>`;
   document.getElementById('voltar').onclick = () => { if (location.pathname.startsWith('/s/')) history.replaceState(null, '', '/'); S.tela = 'inicio'; render(); };
+  ligarTelaCheia();
   document.getElementById('f-entrar').onsubmit = (ev) => {
     ev.preventDefault();
     S.apelido = document.getElementById('apelido-e').value.trim() || 'Jogador';
@@ -2187,7 +2199,7 @@ function telaEspera() {
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
         <span class="ajuda" style="font-size:13px">Sala ${esc(sala.codigo)}${sala.temSenha ? ' · com senha' : ''}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
-      <span style="margin-left:auto">${botaoSom()}</span>
+      <span style="margin-left:auto;display:flex;gap:6px">${botaoSom()}${botaoTelaCheia()}</span>
     </div>
     <section class="bloco">
       <span class="rotulo">Convite</span>
@@ -2240,7 +2252,7 @@ function telaProximaMao(sala, link) {
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
         <span class="ajuda" style="font-size:13px">Sala aberta ${esc(sala.codigo)}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
-      <span style="margin-left:auto">${botaoSom()}</span>
+      <span style="margin-left:auto;display:flex;gap:6px">${botaoSom()}${botaoTelaCheia()}</span>
     </div>
     <div class="bloco" style="align-items:center;text-align:center;gap:8px">
       <span class="avatar-grande" style="cursor:default;border-style:solid">${S.avatar ? `<img src="${S.avatar}" alt="">` : `<span>${esc((S.apelido || '?')[0].toUpperCase())}</span>`}</span>
@@ -2279,7 +2291,12 @@ if (/^https?:$/.test(location.protocol)) {
 
 window.addEventListener('resize', () => { aplicarZoom(); if (S.tela === 'mesa') render(); });
 document.addEventListener('keydown', (ev) => { if (ev.key === '9') { const b = document.getElementById('apertar9'); if (b && !b.disabled) b.click(); } });
-document.addEventListener('fullscreenchange', () => { if (S.tela === 'mesa') render(); });
+document.addEventListener('fullscreenchange', () => {
+  if (S.tela === 'mesa') return render();
+  // nas outras telas só troca o ícone (sem redesenhar e perder o que foi digitado)
+  const b = document.getElementById('tela-cheia');
+  if (b) { b.querySelector('svg').innerHTML = iconeTelaCheia(); b.setAttribute('aria-label', document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia'); }
+});
 aplicarZoom();
 // Verso das cartas: usa a arte "fundo das cartas" quando ela estiver na pasta cartas/
 (function () { const i = new Image(); i.onload = () => document.body.classList.add('tem-verso'); i.src = 'cartas/verso.webp'; })();

@@ -455,6 +455,23 @@ function buscarSalas() {
 }
 
 // ---------- telas ----------
+// Redesenhar a mesma tela (voto, regra, bot, lugar…) mantém o ponto onde a pessoa estava:
+// a tela nunca "sobe" sozinha, e as entradas animadas só acontecem na primeira vez.
+let telaDesenhada = null;
+function comRolagem(nome, fn) {
+  return function (...args) {
+    const t = app.querySelector('.tela');
+    const repetida = telaDesenhada === nome && !!t;
+    const y = repetida ? t.scrollTop : 0;
+    S.repetindoTela = repetida;
+    telaDesenhada = nome;
+    const r = fn.apply(this, args);
+    S.repetindoTela = false;
+    const t2 = app.querySelector('.tela');
+    if (t2 && y) t2.scrollTop = y;
+    return r;
+  };
+}
 function render() {
   // a página em si nunca rola (só as telas por dentro): se algo a empurrou, volta ao lugar
   if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0);
@@ -736,6 +753,7 @@ function htmlAvatar(j) {
   return `<span class="inicial">${esc(j.nome.replace('Bot ', '')[0].toUpperCase())}</span>`;
 }
 function telaMesa() {
+  telaDesenhada = null;
   const e = S.e, ui = S.ui, v = visaoDe(e, EU);
   const vez = minhaVez() && !ui.distribuindo; // enquanto as cartas são distribuídas ninguém joga
   const mao = minhaMao().filter((c) => !(ui.pendentes && ui.pendentes.has(c.id)));
@@ -1644,8 +1662,8 @@ function telaFim() {
   const porVit = fim.modo === 'vitorias';
   const aberta = !!e.opcoes.salaAberta;
   const dono = souDonoDaSala();
-  const linhas = r.colocacao.map((c, i) => `<div class="lin entra ${c.jogador === EU ? 'eu' : ''}" style="--i:${i}"><span class="pos" style="color:${c.posicao === 1 ? 'var(--destaque)' : 'inherit'}">${c.posicao}º</span><span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nomeJog(c.jogador).replace('Bot ', ''))}</span><span class="dir" style="color:var(--suave)">${c.pontosNaMao} pts</span><span class="ganho">+${c.ganhou}</span></div>`).join('');
-  const geral = placarGeral.map((p, i) => `<div class="lin entra ${aberta ? 'cinco' : ''} ${p.jogador === EU ? 'eu' : ''}" style="--i:${i + r.colocacao.length}"><span class="pos">${i + 1}º</span><span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.jogador === EU ? (S.apelido || 'Você') : p.nome.replace('Bot ', ''))}</span><span class="dir" style="font-weight:800;color:${porVit ? 'var(--destaque)' : 'var(--suave)'}">${aberta ? p.vitorias : `${p.vitorias} ${p.vitorias === 1 ? 'vit.' : 'vits.'}`}</span>${aberta ? `<span class="dir" style="font-weight:800;color:var(--suave)">${p.maos}</span>` : ''}<span class="ganho" style="color:var(--texto)">${p.pontos}</span></div>`).join('');
+  const linhas = r.colocacao.map((c, i) => `<div class="lin ${S.repetindoTela ? '' : 'entra'} ${c.jogador === EU ? 'eu' : ''}" style="--i:${i}"><span class="pos" style="color:${c.posicao === 1 ? 'var(--destaque)' : 'inherit'}">${c.posicao}º</span><span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nomeJog(c.jogador).replace('Bot ', ''))}</span><span class="dir" style="color:var(--suave)">${c.pontosNaMao} pts</span><span class="ganho">+${c.ganhou}</span></div>`).join('');
+  const geral = placarGeral.map((p, i) => `<div class="lin ${S.repetindoTela ? '' : 'entra'} ${aberta ? 'cinco' : ''} ${p.jogador === EU ? 'eu' : ''}" style="--i:${i + r.colocacao.length}"><span class="pos">${i + 1}º</span><span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.jogador === EU ? (S.apelido || 'Você') : p.nome.replace('Bot ', ''))}</span><span class="dir" style="font-weight:800;color:${porVit ? 'var(--destaque)' : 'var(--suave)'}">${aberta ? p.vitorias : `${p.vitorias} ${p.vitorias === 1 ? 'vit.' : 'vits.'}`}</span>${aberta ? `<span class="dir" style="font-weight:800;color:var(--suave)">${p.maos}</span>` : ''}<span class="ganho" style="color:var(--texto)">${p.pontos}</span></div>`).join('');
   const rotulo = acabou ? 'Fim da partida' : aberta ? `Mão ${e.rodada} · sala aberta` : fim.modo === 'rodadas' ? `Rodada ${e.rodada} de ${fim.valor}` : `Rodada ${e.rodada}`;
   if (ui.votoEnviado === undefined && S.online && votosAtuais()[EU] !== undefined) ui.votoEnviado = votosAtuais()[EU];
   const votou = ui.votoEnviado !== undefined;
@@ -2474,6 +2492,12 @@ if (/^https?:$/.test(location.protocol)) {
 
 window.addEventListener('resize', () => { aplicarZoom(); if (S.tela === 'mesa') render(); });
 document.addEventListener('keydown', (ev) => { if (ev.key === '9') { const b = document.getElementById('apertar9'); if (b && !b.disabled) b.click(); } });
+telaInicio = comRolagem('inicio', telaInicio);
+telaCriar = comRolagem('criar', telaCriar);
+telaFim = comRolagem('fim', telaFim);
+telaEspera = comRolagem('espera', telaEspera);
+telaEntrar = comRolagem('entrar', telaEntrar);
+telaArte = comRolagem('arte', telaArte);
 document.addEventListener('fullscreenchange', () => {
   if (S.tela === 'mesa') return render();
   // nas outras telas só troca o ícone (sem redesenhar e perder o que foi digitado)

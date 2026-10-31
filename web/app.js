@@ -356,6 +356,8 @@ function buscarSalas() {
 
 // ---------- telas ----------
 function render() {
+  // a página em si nunca rola (só as telas por dentro): se algo a empurrou, volta ao lugar
+  if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0);
   if (S.tela === 'entrar') return telaEntrar();
   if (S.tela === 'espera') return telaEspera();
   if (S.tela === 'inicio') return telaInicio();
@@ -497,7 +499,13 @@ function telaCriar() {
     <p class="aviso erro" id="erro-criar" role="alert" style="height:auto;white-space:normal"></p>
     <button class="btn btn-principal" id="comecar" style="min-height:56px;flex:none">${online ? 'Criar sala e gerar link' : 'Começar'}</button>
   </main>`;
-  const salvar = () => { guardarCampos(); gravar('ur-config', c); telaCriar(); };
+  // redesenha sem perder o ponto da tela onde a pessoa estava
+  const salvar = () => {
+    guardarCampos(); gravar('ur-config', c);
+    const y = app.querySelector('.tela') ? app.querySelector('.tela').scrollTop : 0;
+    telaCriar();
+    const t = app.querySelector('.tela'); if (t) t.scrollTop = y;
+  };
   document.getElementById('voltar').onclick = () => { S.tela = 'inicio'; render(); };
   document.getElementById('menos').onclick = () => { c.lugares = Math.max(2, c.lugares - 1); salvar(); };
   document.getElementById('mais').onclick = () => { c.lugares = Math.min(10, c.lugares + 1); salvar(); };

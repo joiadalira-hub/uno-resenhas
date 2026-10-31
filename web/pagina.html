@@ -44,8 +44,9 @@ h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
 .segmentos button[aria-pressed="true"] { background: var(--destaque); color: var(--sobre-destaque); font-weight: 800; }
 .passo { display: flex; align-items: center; gap: 10px; }
 .passo span { min-width: 34px; text-align: center; font: 800 22px var(--display); font-variant-numeric: tabular-nums; }
-.chave { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; cursor: pointer; }
-.chave input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.chave { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; cursor: pointer; }
+/* a caixinha escondida fica dentro do próprio interruptor: marcar não faz a tela pular */
+.chave input { position: absolute; right: 0; top: 50%; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .chave .trilho { flex: none; width: 50px; height: 30px; border-radius: 15px; background: var(--borda); position: relative; transition: background .15s; }
 .chave .trilho::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 12px; background: #fff; transition: transform .15s; }
 .chave input:checked + .trilho { background: var(--ok); }

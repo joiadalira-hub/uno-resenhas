@@ -291,6 +291,7 @@ body.tem-verso .voo b { display: none; }
 .ultima-carta .verso { width: 84px; aspect-ratio: 650 / 1002; border-radius: 10px; box-shadow: 0 0 0 6px rgba(255,212,59,.3), 0 0 40px rgba(255,212,59,.6); animation: vit-pop .5s .2s cubic-bezier(.2,1.6,.4,1) both, pulsa .6s .7s ease-in-out infinite; }
 .ultima-show.esqueceu .anim-titulo { color: #fff; -webkit-text-stroke: 3px #3A0805; text-shadow: 0 7px 0 var(--perigo), 0 14px 30px rgba(0,0,0,.75); }
 .ultima-show.esqueceu .ultima-carta .verso { box-shadow: 0 0 0 6px rgba(242,69,61,.35), 0 0 40px rgba(242,69,61,.7); }
+.toast { position: fixed; z-index: 50; left: 50%; top: 14px; transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); box-sizing: border-box; padding: 12px 16px; border-radius: 14px; background: var(--destaque); color: var(--sobre-destaque); font-weight: 800; text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,.5); animation: surge .2s ease-out; }
 /* Painel de som e call */
 .painel-som { position: fixed; z-index: 40; width: min(300px, calc(100vw - 16px)); box-sizing: border-box; background: var(--superficie); border: 2px solid var(--borda); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.6); animation: surge .15s ease-out; }
 .ps-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; font-weight: 700; }

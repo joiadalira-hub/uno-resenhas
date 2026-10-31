@@ -1839,6 +1839,7 @@ function conectar(aoAbrir) {
     const fila = o.fila; o.fila = [];
     fila.forEach((m) => ws.send(JSON.stringify(m)));
     clearInterval(o.ping); o.ping = setInterval(() => enviar({ tipo: 'ping' }), 25000);
+    clearInterval(o.vivo); o.vivo = setInterval(() => { if (o.codigo) fetch('/saude', { cache: 'no-store' }).catch(() => {}); }, 5 * 60 * 1000); // o servidor grátis não dorme com a sala aberta
     if (S.tela === 'mesa' || S.tela === 'espera') render();
   };
   ws.onmessage = (ev) => { o.ultimaMsg = Date.now(); let m; try { m = JSON.parse(ev.data); } catch { return; } receberDoServidor(m); };
@@ -1887,18 +1888,48 @@ function criarSalaOnline() {
   S.online = null;
   document.getElementById('comecar').disabled = true;
   document.getElementById('erro-criar').textContent = 'Criando a sala…';
-  conectar(() => enviar({ tipo: 'criar', apelido: S.apelido, avatar: S.avatar, nome: c.nomeSala, senha: c.senha, config: { lugares, salaAberta: !!c.salaAberta, fimModo: c.fimModo, fimValor: c.fimValor, tempo: c.tempo, opcoes: c.opcoes } }));
+  const criacao = { tipo: 'criar', nome: c.nomeSala, senha: c.senha, config: { lugares, salaAberta: !!c.salaAberta, fimModo: c.fimModo, fimValor: c.fimValor, tempo: c.tempo, opcoes: c.opcoes } };
+  conectar(() => enviar({ ...criacao, apelido: S.apelido, avatar: S.avatar }));
+  S.online.criacao = criacao; S.online.senha = c.senha;
+}
+// Guarda o necessário para voltar à sala (e, se for o dono, recriá-la) mesmo recarregando a página
+function guardarSala() {
+  const o = S.online;
+  if (o && o.codigo) gravar('ur-sala', { codigo: o.codigo, token: o.token, senha: o.senha || '', criacao: o.criacao || null, dono: !!o.souDono });
+}
+// O servidor reiniciou e a sala sumiu: o dono recria com o mesmo código; os outros esperam e entram de novo
+function salaSumiu() {
+  const o = S.online;
+  if (!o.recriando) o.recriando = { desde: Date.now(), dono: !!(o.souDono && o.criacao) };
+  if (Date.now() - o.recriando.desde > 90000) { S.erroInicio = 'A sala fechou e ninguém a recriou. Crie outra ou entre em uma da lista.'; return sairDaSala(); }
+  pararTimers();
+  document.querySelectorAll('.palco, .vitoria-show').forEach((x) => x.remove());
+  S.e = null; o.sala = null; S.tela = 'espera'; render();
+  if (o.recriando.dono) enviar({ ...o.criacao, codigo: o.codigo, apelido: S.apelido, avatar: S.avatar });
+  else setTimeout(() => { if (S.online === o && o.recriando) enviar({ tipo: 'entrar', codigo: o.codigo, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha || '' }); }, 3000);
+}
+function mostrarToast(texto, ms = 6000) {
+  document.querySelectorAll('.toast').forEach((x) => x.remove());
+  const t = document.createElement('div');
+  t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = texto;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), ms);
 }
 function entrarNaSala(codigo, senha) {
   S.codigoEntrar = codigo;
   const salvo = ler('ur-sala', null);
-  const token = salvo && salvo.codigo === codigo ? salvo.token : null;
+  const mesma = salvo && salvo.codigo === codigo;
+  const token = mesma ? salvo.token : null;
+  if (mesma && !senha) senha = salvo.senha || '';
   S.online = null;
   conectar(() => enviar({ tipo: 'entrar', codigo, senha, token, apelido: S.apelido || 'Jogador', avatar: S.avatar }));
   S.online.senha = senha;
+  if (mesma) { S.online.criacao = salvo.criacao; S.online.souDono = salvo.dono; }
 }
 function sairDaSala() {
+  S.avisoRecriada = false;
   sairDaCall();
+  if (S.online) clearInterval(S.online.vivo);
   document.querySelectorAll('.painel-som').forEach((x) => x.remove());
   const o = S.online;
   if (o) { o.saindo = true; enviar({ tipo: 'sair' }); setTimeout(() => o.ws && o.ws.close(), 200); }
@@ -1914,13 +1945,15 @@ function receberDoServidor(m) {
   if (!o) return;
   if (m.tipo === 'entrou') {
     o.codigo = m.codigo; o.token = m.token; o.meuId = m.meuId; EU = m.meuId;
-    gravar('ur-sala', { codigo: m.codigo, token: m.token });
+    if (o.recriando) { o.recriando = null; S.avisoRecriada = true; }
+    guardarSala();
     if (location.pathname !== '/s/' + m.codigo) history.replaceState(null, '', '/s/' + m.codigo);
     return;
   }
   if (m.tipo === 'sala') {
     const donoAntes = o.sala && o.sala.dono;
     o.sala = m.sala;
+    if (o.souDono !== (m.sala.dono === EU)) { o.souDono = m.sala.dono === EU; guardarSala(); }
     atualizarCall();
     const eu = m.sala.assentos.find((a) => a.id === EU);
     if (m.sala.fase === 'espera' || (eu && eu.pendente)) { S.tela = 'espera'; render(); }
@@ -1931,9 +1964,10 @@ function receberDoServidor(m) {
   }
   if (m.tipo === 'removido') { S.erroInicio = 'Você saiu da mesa.'; return sairDaSala(); }
   if (m.tipo === 'rtc') return receberRtc(m);
+  if (m.tipo === 'aviso') return mostrarToast(m.mensagem, 9000);
   if (m.tipo === 'estado') return receberEstado(m);
   if (m.tipo === 'erro') {
-    if (o.codigo && /não encontrada/i.test(m.mensagem)) { S.erroInicio = 'Essa sala fechou (o servidor reiniciou ou ficou parado). Crie outra.'; return sairDaSala(); }
+    if (o.codigo && /não encontrada/i.test(m.mensagem)) return salaSumiu();
     if (S.tela === 'mesa' && S.ui) { tocar('erro'); S.ui.aviso = m.mensagem; S.ui.erro = true; render(); return; }
     if (!o.codigo) {
       o.saindo = true; o.ws.close(); S.online = null;
@@ -1978,6 +2012,7 @@ function receberEstado(m) {
     return depoisDeMudar();
   }
   if (ev && (ev.tipo === 'inicio' || ev.tipo === 'rodada')) {
+    S.avisoRecriada = false;
     document.querySelectorAll('.palco, .vitoria-show').forEach((x) => x.remove());
     S.e = novo;
     S.ui = novaUI();
@@ -2031,6 +2066,15 @@ function telaEntrar() {
 }
 function telaEspera() {
   const o = S.online, sala = o && o.sala;
+  if (!sala && o && o.recriando) {
+    app.innerHTML = `<main class="tela"><div class="bloco" style="align-items:center;text-align:center;gap:10px;margin-top:20vh">
+      <h2 style="font-size:24px;color:var(--destaque)">O servidor reiniciou</h2>
+      <span style="color:var(--suave)">As salas foram apagadas. ${o.recriando.dono ? 'Recriando a sua sala com o mesmo link…' : 'Esperando o dono recriar a sala para você entrar de novo…'}</span>
+      <span class="ajuda">O placar da partida anterior se perdeu.</span></div>
+      <button class="btn" id="sair-espera" style="margin-top:auto">Sair</button></main>`;
+    document.getElementById('sair-espera').onclick = sairDaSala;
+    return;
+  }
   if (!sala) { app.innerHTML = '<main class="tela"><p class="aviso">Conectando…</p></main>'; return; }
   const souDono = sala.dono === EU;
   const link = `${location.origin}/s/${sala.codigo}`;
@@ -2067,6 +2111,7 @@ function telaEspera() {
           <b>${a.id === sala.dono ? 'DONO' : a.tipo === 'bot' ? (souDono ? 'Tirar bot' : 'BOT') : a.conectado ? '' : 'caiu'}</b></button>`;
       }).join('')}
     </div>
+    ${S.avisoRecriada ? '<p class="aviso" style="height:auto;white-space:normal;color:var(--destaque)">A sala foi recriada depois que o servidor reiniciou. O placar anterior se perdeu.</p>' : ''}
     <p class="aviso erro" id="erro-espera" role="alert" style="height:auto;white-space:normal"></p>
     ${souDono
       ? `<button class="btn btn-principal" id="comecar-online" style="min-height:56px;margin-top:auto" ${ocupados < 2 ? 'disabled' : ''}>Começar${humanos < 2 ? ' com os bots' : ''}</button>

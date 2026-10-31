@@ -79,7 +79,9 @@ class Sala {
   constructor(msg, conexao) {
     const cfg = msg.config || {};
     const lugares = Array.isArray(cfg.lugares) ? cfg.lugares.slice(0, 9) : ['bot'];
-    this.codigo = novoCodigo();
+    // depois de o servidor reiniciar, o dono recria a sala com o mesmo código (o link continua valendo)
+    const pedido = String(msg.codigo || '').toUpperCase();
+    this.codigo = /^[A-Z0-9]{5}$/.test(pedido) && !salas.has(pedido) ? pedido : novoCodigo();
     this.nome = limpaTexto(msg.nome, 30) || 'Sala de resenha';
     this.senha = limpaTexto(msg.senha, 20);
     const salaAberta = !!cfg.salaAberta;
@@ -498,3 +500,21 @@ setInterval(() => {
 }, 60 * 1000).unref();
 
 servidor.listen(PORTA, () => log(`Uno Resenhas no ar na porta ${PORTA}`));
+
+// Plano grátis do Render: o servidor dorme depois de 15 min sem acessos. Enquanto houver gente
+// numa sala, ele mesmo se visita de 10 em 10 minutos para não dormir no meio da partida.
+const ENDERECO = process.env.RENDER_EXTERNAL_URL;
+if (ENDERECO) setInterval(() => {
+  const alguem = [...salas.values()].some((sala) => sala.humanos().some((h) => h.conectado));
+  if (alguem) fetch(ENDERECO + '/saude').catch(() => {});
+}, 10 * 60 * 1000).unref();
+
+// Atualização do servidor (o Render avisa antes de desligar): todo mundo recebe o aviso na tela
+let desligando = false;
+process.on('SIGTERM', () => {
+  if (desligando) return;
+  desligando = true;
+  log('servidor desligando: avisando as salas');
+  for (const sala of salas.values()) for (const h of sala.humanos()) if (h.conexao) h.conexao.enviar({ tipo: 'aviso', mensagem: 'O servidor está atualizando. Em instantes a sala volta (o placar desta partida se perde).' });
+  setTimeout(() => process.exit(0), 1500);
+});

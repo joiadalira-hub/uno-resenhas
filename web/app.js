@@ -153,6 +153,36 @@ const nomeJog = (id) => (id === EU ? 'Você' : S.e.jogadores.find((j) => j.id ==
 const minhaMao = () => S.e.jogadores.find((j) => j.id === EU).mao;
 const minhaVez = () => S.e.fase === 'jogando' && S.e.jogadores[S.e.vez].id === EU;
 
+// ---------- salas para entrar (tela inicial) ----------
+S.salas = null;
+let timerSalas = null;
+function htmlSalasAbertas() {
+  const l = S.salas;
+  if (!l) return '<p class="ajuda" style="margin:0;text-align:center">Procurando salas…</p>';
+  if (!l.length) return '<p class="ajuda" style="margin:0;text-align:center">Nenhuma sala aberta agora. Crie a sua!</p>';
+  const modo = (m) => ({ vitorias: 'vitórias', sem_fim: 'sem fim', rodadas: 'rodadas', pontos: 'pontos' }[m] || m);
+  return `<span class="rotulo">Salas para entrar</span>` + l.map((x) => `<button type="button" class="sala-item" data-sala="${esc(x.codigo)}">
+      <span class="sala-nome">${x.temSenha ? '🔒 ' : ''}${esc(x.nome)}</span>
+      <span class="sala-info">${x.aberta ? 'Sala aberta' : 'Esperando começar'}${x.jogando ? ' · jogando agora' : ''} · ${modo(x.modo)}</span>
+      <b>${x.ocupados}/${x.lugares}</b></button>`).join('');
+}
+function ligarSalasAbertas() {
+  app.querySelectorAll('[data-sala]').forEach((b) => (b.onclick = () => {
+    const ap = document.getElementById('apelido');
+    if (ap) { S.apelido = ap.value.trim() || S.apelido; gravar('ur-apelido', S.apelido); }
+    S.codigoEntrar = b.dataset.sala; S.tela = 'entrar'; render();
+  }));
+}
+function buscarSalas() {
+  clearTimeout(timerSalas);
+  if (!S.temServidor || S.tela !== 'inicio') return;
+  fetch('/salas', { cache: 'no-store' }).then((r) => r.json()).then((l) => {
+    S.salas = Array.isArray(l) ? l : [];
+    const el = document.getElementById('salas-abertas');
+    if (el && S.tela === 'inicio') { el.innerHTML = htmlSalasAbertas(); ligarSalasAbertas(); }
+  }).catch(() => {}).finally(() => { clearTimeout(timerSalas); if (S.tela === 'inicio') timerSalas = setTimeout(buscarSalas, 5000); });
+}
+
 // ---------- telas ----------
 function render() {
   if (S.tela === 'entrar') return telaEntrar();
@@ -190,6 +220,7 @@ function telaInicio() {
       <label for="apelido" style="font-weight:700;color:var(--suave)">Seu apelido</label>
       <input id="apelido" class="campo" maxlength="14" autocomplete="nickname" value="${esc(S.apelido)}" placeholder="Como te chamam na mesa">
       <button class="btn btn-principal" style="min-height:56px;margin-top:8px" type="button" id="criar-online" ${S.temServidor === false ? 'disabled' : ''}>Criar sala online</button>
+      ${S.temServidor ? `<div class="salas-abertas" id="salas-abertas">${htmlSalasAbertas()}</div>` : ''}
       <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px">
         <input id="codigo" class="campo" maxlength="40" autocomplete="off" placeholder="Código ou link da sala" aria-label="Código ou link da sala" style="text-transform:uppercase" ${S.temServidor === false ? 'disabled' : ''}>
         <button class="btn" type="button" id="entrar-codigo" ${S.temServidor === false ? 'disabled' : ''}>Entrar</button>
@@ -201,6 +232,8 @@ function telaInicio() {
   </main>`;
   S.erroInicio = null;
   ligarBotaoSom();
+  ligarSalasAbertas();
+  buscarSalas();
   const entrada = document.getElementById('arquivo-foto');
   document.getElementById('foto').onclick = () => entrada.click();
   const tirar = document.getElementById('tirar-foto');
@@ -259,7 +292,7 @@ function telaCriar() {
       <input id="nome-sala" class="campo" maxlength="30" value="${esc(c.nomeSala || 'Resenha dos amigos')}">
       <label for="senha-sala" style="font-weight:700">Senha</label>
       <input id="senha-sala" class="campo" maxlength="20" value="${esc(c.senha || '')}" placeholder="Opcional" autocomplete="off">
-      <label class="chave" for="sala-aberta"><span style="display:flex;flex-direction:column"><span style="font-weight:700">Sala aberta</span><span class="ajuda">Gente entra e sai a cada mão, sem criar outra sala. O placar mostra as mãos jogadas.</span></span>
+      <label class="chave" for="sala-aberta"><span style="display:flex;flex-direction:column"><span style="font-weight:700">Sala aberta</span><span class="ajuda">Gente entra e sai a cada mão, sem criar outra sala, até 10 na mesa. O placar mostra as mãos jogadas.</span></span>
         <input type="checkbox" id="sala-aberta" ${c.salaAberta ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label>
     </section>` : ''}
     <section class="bloco">

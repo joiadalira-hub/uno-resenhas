@@ -33,6 +33,7 @@ const servidor = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   let caminho = decodeURIComponent(url.pathname);
   if (caminho === '/saude') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
+  if (caminho === '/salas') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify(salasParaEntrar())); }
   if (caminho === '/' || caminho.startsWith('/s/')) caminho = '/index.html';
   const arquivo = path.join(RAIZ, path.normalize(caminho));
   if (!arquivo.startsWith(RAIZ)) { res.writeHead(403); return res.end(); }
@@ -49,6 +50,21 @@ const servidor = http.createServer((req, res) => {
 
 // ---------------- salas ----------------
 const salas = new Map();
+// Lista da tela inicial: salas com lugar livre agora (ou sala aberta com a partida rolando)
+function salasParaEntrar() {
+  const lista = [];
+  for (const sala of salas.values()) {
+    if (!sala.humanos().some((h) => h.conectado)) continue;
+    const ocupados = sala.assentos.filter((a) => a.tipo !== 'aberto' && !a.saiu && !a.sai).length;
+    const humanos = sala.humanos().filter((h) => !h.saiu).length;
+    let pode = false;
+    if (sala.fase === 'espera') pode = sala.assentos.some((a) => a.tipo === 'aberto') || (sala.config.salaAberta && sala.assentos.length < sala.capacidade);
+    else if (sala.fase === 'jogando' && sala.config.salaAberta) pode = humanos < sala.capacidade;
+    if (!pode) continue;
+    lista.push({ codigo: sala.codigo, nome: sala.nome, temSenha: !!sala.senha, aberta: sala.config.salaAberta, jogando: sala.fase === 'jogando', ocupados, lugares: sala.config.salaAberta ? sala.capacidade : sala.assentos.length, modo: sala.config.fimModo });
+  }
+  return lista.slice(0, 30);
+}
 const LETRAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function novoCodigo() {
   let c;
@@ -80,7 +96,8 @@ class Sala {
     const dono = this.novoHumano(msg, conexao);
     this.dono = dono.id;
     this.assentos = [dono];
-    this.capacidade = 1 + lugares.length;
+    // sala aberta: a mesa vai até 10, não importa quantos lugares foram escolhidos no começo
+    this.capacidade = this.config.salaAberta ? 10 : 1 + lugares.length;
     lugares.forEach((t, i) => this.assentos.push(t === 'bot' ? this.novoBot(i) : { tipo: 'aberto', id: `a${this.seq++}` }));
     this.e = null;
     this.fase = 'espera';
@@ -385,7 +402,8 @@ function tratar(conexao, msg, ctx) {
         ctx.sala = sala; ctx.assento = novo;
       } else {
         if (sala.fase !== 'espera') return erro(conexao, sala.fase === 'final' ? 'Essa partida já terminou.' : 'A partida já começou nesta sala.');
-        const i = sala.assentos.findIndex((a) => a.tipo === 'aberto');
+        let i = sala.assentos.findIndex((a) => a.tipo === 'aberto');
+        if (i < 0 && sala.config.salaAberta && sala.assentos.length < sala.capacidade) { sala.assentos.push({ tipo: 'aberto' }); i = sala.assentos.length - 1; }
         if (i < 0) return erro(conexao, 'A sala está cheia.');
         sala.assentos[i] = sala.novoHumano(msg, conexao);
         ctx.sala = sala; ctx.assento = sala.assentos[i];

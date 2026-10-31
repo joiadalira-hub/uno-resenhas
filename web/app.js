@@ -1488,6 +1488,7 @@ function telaFim() {
     </div>
     <div class="tabela"><div class="lin cab"><span>Pos.</span><span>Jogador</span><span class="dir">Na mão</span><span class="dir">Ganhou</span></div>${linhas}</div>
     <div class="tabela"><div class="lin cab ${aberta ? 'cinco' : ''}"><span></span><span>Placar geral</span><span class="dir">Vitórias</span>${aberta ? '<span class="dir">Mãos</span>' : ''}<span class="dir">Pontos</span></div>${geral}</div>
+    ${aberta && S.online && S.online.sala ? htmlConvite(S.online.sala) : ''}
     <section class="bloco votacao">
       <span class="rotulo">${acabou ? 'Jogar outra partida?' : aberta ? 'Jogar a próxima mão?' : 'Jogar a próxima rodada?'}</span>
       ${votou
@@ -1506,6 +1507,7 @@ function telaFim() {
     </div>
   </main>`;
   const $ = (id) => document.getElementById(id);
+  ligarConvite();
   if ($('voto-sim')) $('voto-sim').onclick = () => { ui.voto = true; telaFim(); };
   if ($('voto-nao')) $('voto-nao').onclick = () => { ui.voto = false; telaFim(); };
   if ($('ok-voto')) $('ok-voto').onclick = () => confirmarVoto(ui.voto);
@@ -1513,6 +1515,38 @@ function telaFim() {
   if ($('finalizar')) $('finalizar').onclick = () => {
     if (S.online) { $('finalizar').disabled = true; enviar({ tipo: 'finalizar' }); return; }
     S.arteDe = 'final'; S.tela = 'arte'; render();
+  };
+}
+// Sala aberta: entre as mãos, o link fica à mão para chamar mais gente antes da próxima
+function htmlConvite(sala) {
+  const link = `${location.origin}/s/${sala.codigo}`;
+  const convite = `Bora jogar Uno Resenhas! Entra na mesa "${sala.nome}" que a próxima mão já vai começar:\n${link}${sala.temSenha ? '\n(peça a senha no grupo)' : ''}`;
+  const lugares = sala.assentos.filter((a) => !a.sai).length;
+  return `<section class="bloco convite-fim" data-link="${esc(link)}" data-texto="${esc(convite)}">
+    <div class="linha"><span class="rotulo">Chamar mais gente</span><span class="ajuda">${lugares}/10 na mesa</span></div>
+    <span class="ajuda" style="margin-top:-6px">Quem entrar agora já senta na próxima mão.</span>
+    <div class="linha" style="background:var(--chao);border:2px solid var(--borda);border-radius:12px;padding:6px 6px 6px 14px">
+      <span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;user-select:all" id="link-fim">${esc(link)}</span>
+      <button class="btn" id="copiar-fim" style="min-height:40px;flex:none">Copiar</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+      <a class="btn" href="https://wa.me/?text=${encodeURIComponent(convite)}" target="_blank" rel="noopener" style="display:grid;place-items:center;text-decoration:none;background:#25D366;border-color:#25D366;color:#06210F;font-weight:800">WhatsApp</a>
+      <button class="btn" id="compartilhar-fim">Compartilhar</button>
+    </div></section>`;
+}
+function ligarConvite() {
+  const caixa = document.querySelector('.convite-fim');
+  if (!caixa) return;
+  const link = caixa.dataset.link, texto = caixa.dataset.texto;
+  document.getElementById('copiar-fim').onclick = async (ev) => {
+    const b = ev.currentTarget;
+    try { await navigator.clipboard.writeText(link); b.textContent = 'Copiado!'; }
+    catch { const r = document.createRange(); r.selectNodeContents(document.getElementById('link-fim')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = 'Selecionado'; }
+  };
+  const comp = document.getElementById('compartilhar-fim');
+  comp.onclick = async () => {
+    if (navigator.share) { try { await navigator.share({ title: 'Uno Resenhas', text: texto }); return; } catch (err) { if (err && err.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(texto); comp.textContent = 'Convite copiado!'; } catch { comp.textContent = 'Use o Copiar'; }
   };
 }
 function confirmarVoto(sim) {

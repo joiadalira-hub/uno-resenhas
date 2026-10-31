@@ -447,6 +447,21 @@ function tratar(conexao, msg, ctx) {
     if (outro && msg.dados && typeof msg.dados === 'object') outro.conexao.enviar({ tipo: 'rtc', de: assento.id, dados: msg.dados });
     return;
   }
+  // O dono muda as regras na espera ou entre as mãos: valem a partir da próxima mão
+  if (tipo === 'config') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala muda as regras.');
+    if (sala.fase !== 'espera' && !(sala.e && sala.e.fase !== 'jogando')) return erro(conexao, 'Espere a mão acabar para mudar as regras.');
+    const PERMITIDAS = ['acumularCompras', 'mais2NaoRespondeMais5', 'mais5SobreMais2', 'vencerComEspecial', 'corte', 'comprarAtePoder', 'morteSubita', 'regraDo5', 'regraDo9'];
+    const novas = {};
+    for (const k of PERMITIDAS) if (msg.opcoes && typeof msg.opcoes[k] === 'boolean') novas[k] = msg.opcoes[k];
+    sala.config.opcoes = { ...sala.config.opcoes, ...novas };
+    if ([0, 15, 20, 30].includes(Number(msg.tempo))) sala.config.tempo = Number(msg.tempo);
+    if (sala.e) Object.assign(sala.e.opcoes, novas);
+    sala.enviarSala();
+    for (const h of sala.humanos()) if (h !== assento && h.conexao) h.conexao.enviar({ tipo: 'aviso', curto: true, mensagem: 'O dono mudou as regras da sala: valem a partir da próxima mão.' });
+    log('regras mudadas', sala.codigo);
+    return;
+  }
   if (tipo === 'voto') { if (sala.e) sala.votar(assento.id, msg.sim); return; }
   if (tipo === 'finalizar') {
     if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala pode finalizar.');
@@ -516,5 +531,6 @@ process.on('SIGTERM', () => {
   desligando = true;
   log('servidor desligando: avisando as salas');
   for (const sala of salas.values()) for (const h of sala.humanos()) if (h.conexao) h.conexao.enviar({ tipo: 'aviso', mensagem: 'O servidor está atualizando. Em instantes a sala volta (o placar desta partida se perde).' });
+  servidor.close(); // para de aceitar conexões novas; as abertas recebem o aviso
   setTimeout(() => process.exit(0), 1500);
 });

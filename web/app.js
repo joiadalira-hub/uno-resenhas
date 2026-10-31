@@ -1524,12 +1524,13 @@ function telaFim() {
       <div class="votos" id="votos">${htmlVotos()}</div>
     </section>
     <div class="fim-botoes">
-      ${dono ? `<button class="btn" id="finalizar">Finalizar partida</button>` : ''}
+      ${dono ? `<button class="btn" id="config-sala">⚙ Regras da sala</button><button class="btn" id="finalizar">Finalizar partida</button>` : ''}
       ${acabou && !dono ? `<button class="btn" id="ver-arte">Arte do placar</button>` : ''}
     </div>
   </main>`;
   const $ = (id) => document.getElementById(id);
   ligarConvite();
+  if ($('config-sala')) $('config-sala').onclick = abrirConfigSala;
   if ($('voto-sim')) $('voto-sim').onclick = () => { ui.voto = true; telaFim(); };
   if ($('voto-nao')) $('voto-nao').onclick = () => { ui.voto = false; telaFim(); };
   if ($('ok-voto')) $('ok-voto').onclick = () => confirmarVoto(ui.voto);
@@ -1570,6 +1571,46 @@ function ligarConvite() {
     if (navigator.share) { try { await navigator.share({ title: 'Uno Resenhas', text: texto }); return; } catch (err) { if (err && err.name === 'AbortError') return; } }
     try { await navigator.clipboard.writeText(texto); comp.textContent = 'Convite copiado!'; } catch { comp.textContent = 'Use o Copiar'; }
   };
+}
+// ---------- regras da sala: o dono muda entre as mãos (valem a partir da próxima) ----------
+function abrirConfigSala() {
+  document.querySelectorAll('.fundo-config').forEach((x) => x.remove());
+  const sala = S.online && S.online.sala;
+  const atuais = sala ? { ...OPCOES_PADRAO, ...sala.config.opcoes } : { ...OPCOES_PADRAO, ...(S.e ? S.e.opcoes : S.config.opcoes) };
+  const cfg = { opcoes: Object.fromEntries(REGRAS_OPCIONAIS.map(([k]) => [k, !!atuais[k]])), tempo: sala ? sala.config.tempo : S.config.tempo };
+  const fundo = document.createElement('div');
+  fundo.className = 'fundo-modal fundo-config';
+  const desenhar = () => {
+    fundo.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Regras da sala" style="max-height:85vh;overflow-y:auto">
+      <h2 style="font-size:24px">Regras da sala</h2>
+      <span class="ajuda" style="margin-top:-8px">${S.e && S.e.fase !== 'jogando' ? 'Valem a partir da próxima mão.' : 'Valem a partir da primeira mão.'}</span>
+      <span style="font-weight:700">Tempo por jogada</span>
+      <div class="segmentos">${[[15, '15 s'], [20, '20 s'], [30, '30 s'], [0, 'Livre']].map(([v, r]) => `<button type="button" data-cfg-tempo="${v}" aria-pressed="${cfg.tempo === v}">${r}</button>`).join('')}</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+      ${REGRAS_OPCIONAIS.map(([k, nome, ajuda]) => `
+        <label class="chave" for="cfg-${k}"><span style="display:flex;flex-direction:column"><span style="font-weight:700">${nome}</span><span class="ajuda">${ajuda}</span></span>
+          <input type="checkbox" id="cfg-${k}" data-cfg="${k}" ${cfg.opcoes[k] ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;position:sticky;bottom:-18px;background:var(--superficie);padding:8px 0">
+        <button class="btn" id="cfg-cancelar">Cancelar</button>
+        <button class="btn btn-principal" id="cfg-salvar">Salvar</button>
+      </div></div>`;
+    fundo.querySelectorAll('[data-cfg-tempo]').forEach((b) => (b.onclick = () => { cfg.tempo = Number(b.dataset.cfgTempo); const y = fundo.querySelector('.modal').scrollTop; desenhar(); fundo.querySelector('.modal').scrollTop = y; }));
+    fundo.querySelectorAll('[data-cfg]').forEach((i) => (i.onchange = () => { cfg.opcoes[i.dataset.cfg] = i.checked; }));
+    fundo.querySelector('#cfg-cancelar').onclick = () => fundo.remove();
+    fundo.querySelector('#cfg-salvar').onclick = () => {
+      if (S.online) enviar({ tipo: 'config', opcoes: cfg.opcoes, tempo: cfg.tempo });
+      else {
+        if (S.e) Object.assign(S.e.opcoes, cfg.opcoes);
+        Object.assign(S.config.opcoes, cfg.opcoes); S.config.tempo = cfg.tempo; gravar('ur-config', S.config);
+      }
+      fundo.remove();
+      mostrarToast('Regras salvas: valem na próxima mão', 3500);
+    };
+  };
+  desenhar();
+  fundo.addEventListener('pointerdown', (ev) => { if (ev.target === fundo) fundo.remove(); });
+  document.body.appendChild(fundo);
 }
 function confirmarVoto(sim) {
   if (sim === undefined) return;
@@ -2020,7 +2061,7 @@ function receberDoServidor(m) {
   }
   if (m.tipo === 'removido') { S.erroInicio = 'Você saiu da mesa.'; return sairDaSala(); }
   if (m.tipo === 'rtc') return receberRtc(m);
-  if (m.tipo === 'aviso') return mostrarToast(m.mensagem, 9000);
+  if (m.tipo === 'aviso') return mostrarToast(m.mensagem, m.curto ? 4000 : 9000);
   if (m.tipo === 'estado') return receberEstado(m);
   if (m.tipo === 'erro') {
     if (o.codigo && /não encontrada/i.test(m.mensagem)) return salaSumiu();
@@ -2170,7 +2211,8 @@ function telaEspera() {
     ${S.avisoRecriada ? '<p class="aviso" style="height:auto;white-space:normal;color:var(--destaque)">A sala foi recriada depois que o servidor reiniciou. O placar anterior se perdeu.</p>' : ''}
     <p class="aviso erro" id="erro-espera" role="alert" style="height:auto;white-space:normal"></p>
     ${souDono
-      ? `<button class="btn btn-principal" id="comecar-online" style="min-height:56px;margin-top:auto" ${ocupados < 2 ? 'disabled' : ''}>Começar${humanos < 2 ? ' com os bots' : ''}</button>
+      ? `<button class="btn" id="config-sala" style="margin-top:auto">⚙ Regras da sala</button>
+         <button class="btn btn-principal" id="comecar-online" style="min-height:56px" ${ocupados < 2 ? 'disabled' : ''}>Começar${humanos < 2 ? ' com os bots' : ''}</button>
          <p class="ajuda" style="margin:0;text-align:center">Lugares que ficarem abertos saem da mesa quando você começar.</p>`
       : '<p class="aviso" style="margin-top:auto">Esperando quem criou a sala começar…</p>'}
   </main>`;
@@ -2182,6 +2224,7 @@ function telaEspera() {
     catch { const r = document.createRange(); r.selectNodeContents(document.getElementById('link-sala')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = 'Selecionado'; }
   };
   app.querySelectorAll('[data-alternar]').forEach((b) => (b.onclick = () => enviar({ tipo: 'lugar', indice: Number(b.dataset.alternar) })));
+  if (document.getElementById('config-sala')) document.getElementById('config-sala').onclick = abrirConfigSala;
   const cm = document.getElementById('comecar-online');
   if (cm) cm.onclick = () => { cm.disabled = true; enviar({ tipo: 'comecar' }); };
 }

@@ -1490,8 +1490,8 @@ function htmlVotos() {
       <span class="avatar mini-av">${htmlAvatar(j.id === EU ? { id: EU, nome: S.apelido || 'Você' } : j)}</span>
       <b>${esc(nome)}</b><span class="voto-est">${v === true ? 'Sim ✓' : v === false ? 'Não · sai' : 'pensando…'}</span></span>`;
   }).join('') + chegando.map((a) => `<span class="voto-lin sim" style="--cor-jog:var(--humano)">
-      <span class="avatar mini-av">${a.avatar ? `<img class="figurinha" src="${a.avatar}" alt="">` : `<span class="inicial">${esc(a.nome[0].toUpperCase())}</span>`}</span>
-      <b>${esc(a.nome)}</b><span class="voto-est">chegando ✓</span></span>`).join('');
+      <span class="avatar mini-av">${a.avatar ? `<img class="figurinha" src="${a.avatar}" alt="">` : `<span class="inicial">${esc(a.nome.replace('Bot ', '')[0].toUpperCase())}</span>`}</span>
+      <b>${esc(a.nome.replace('Bot ', ''))}</b><span class="voto-est">chegando ✓</span></span>`).join('');
 }
 function atualizarVotos() {
   const el = document.getElementById('votos');
@@ -1582,6 +1582,48 @@ function ligarConvite() {
     try { await navigator.clipboard.writeText(texto); comp.textContent = 'Convite copiado!'; } catch { comp.textContent = 'Use o Copiar'; }
   };
 }
+// ---------- bots na mesa: o dono põe ou tira (sentam / saem na próxima mão) ----------
+function contagemMesa() {
+  const sala = S.online && S.online.sala;
+  if (sala) {
+    const ativos = sala.assentos.filter((a) => a.tipo !== 'aberto' && !a.sai);
+    return { bots: ativos.filter((a) => a.tipo === 'bot').length, total: ativos.length };
+  }
+  const js = S.e ? S.e.jogadores : [];
+  return { bots: js.filter((j) => j.bot).length, total: js.length };
+}
+function htmlBotsConfig() {
+  const { bots, total } = contagemMesa();
+  return `<div class="linha"><span style="display:flex;flex-direction:column"><span style="font-weight:700">Bots na mesa</span><span class="ajuda">${total} de 10 na mesa · entram ou saem na próxima mão</span></span>
+    <div class="passo"><button class="btn btn-icone" style="border:2px solid var(--borda);background:var(--chao)" id="bot-menos" aria-label="Tirar um bot" ${bots && total > 2 ? '' : 'disabled'}>−</button><span>${bots}</span><button class="btn btn-icone" style="border:2px solid var(--borda);background:var(--chao)" id="bot-mais" aria-label="Pôr um bot" ${total < 10 ? '' : 'disabled'}>+</button></div></div>`;
+}
+function ligarBotsConfig() {
+  const menos = document.getElementById('bot-menos'), mais = document.getElementById('bot-mais');
+  if (menos) menos.onclick = () => mudarBots(-1);
+  if (mais) mais.onclick = () => mudarBots(1);
+}
+function atualizarBotsConfig() {
+  const el = document.getElementById('cfg-bots');
+  if (el) { el.innerHTML = htmlBotsConfig(); ligarBotsConfig(); }
+}
+function mudarBots(delta) {
+  if (S.online) return enviar({ tipo: 'bots', delta });
+  // treino: o bot senta (ou sai) já para a próxima mão
+  const e = S.e;
+  if (!e || e.fase === 'jogando') return;
+  if (delta > 0 && e.jogadores.length < 10) {
+    const usados = new Set(e.jogadores.map((j) => j.nome.replace('Bot ', '')));
+    const nome = NOMES_BOTS.find((n) => !usados.has(n)) || `Bot ${e.jogadores.length}`;
+    let n = 1; while (e.jogadores.some((j) => j.id === `b${n}`)) n++;
+    adicionarJogador(e, { id: `b${n}`, nome: `Bot ${nome}`, bot: true });
+  } else if (delta < 0) {
+    const bots = e.jogadores.filter((j) => j.bot);
+    if (bots.length && e.jogadores.length > 2) removerJogadores(e, [bots[bots.length - 1].id]);
+  }
+  atualizarBotsConfig();
+  if (S.tela === 'fim') { const y = app.querySelector('.tela') ? app.querySelector('.tela').scrollTop : 0; telaFim(); const t = app.querySelector('.tela'); if (t) t.scrollTop = y; }
+}
+
 // ---------- regras da sala: o dono muda entre as mãos (valem a partir da próxima) ----------
 function abrirConfigSala() {
   document.querySelectorAll('.fundo-config').forEach((x) => x.remove());
@@ -1594,6 +1636,7 @@ function abrirConfigSala() {
     fundo.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Regras da sala" style="max-height:85vh;overflow-y:auto">
       <h2 style="font-size:24px">Regras da sala</h2>
       <span class="ajuda" style="margin-top:-8px">${S.e && S.e.fase !== 'jogando' ? 'Valem a partir da próxima mão.' : 'Valem a partir da primeira mão.'}</span>
+      <div id="cfg-bots">${htmlBotsConfig()}</div>
       <span style="font-weight:700">Tempo por jogada</span>
       <div class="segmentos">${[[15, '15 s'], [20, '20 s'], [30, '30 s'], [0, 'Livre']].map(([v, r]) => `<button type="button" data-cfg-tempo="${v}" aria-pressed="${cfg.tempo === v}">${r}</button>`).join('')}</div>
       <div style="display:flex;flex-direction:column;gap:4px">
@@ -1607,6 +1650,7 @@ function abrirConfigSala() {
       </div></div>`;
     fundo.querySelectorAll('[data-cfg-tempo]').forEach((b) => (b.onclick = () => { cfg.tempo = Number(b.dataset.cfgTempo); const y = fundo.querySelector('.modal').scrollTop; desenhar(); fundo.querySelector('.modal').scrollTop = y; }));
     fundo.querySelectorAll('[data-cfg]').forEach((i) => (i.onchange = () => { cfg.opcoes[i.dataset.cfg] = i.checked; }));
+    ligarBotsConfig();
     fundo.querySelector('#cfg-cancelar').onclick = () => fundo.remove();
     fundo.querySelector('#cfg-salvar').onclick = () => {
       if (S.online) enviar({ tipo: 'config', opcoes: cfg.opcoes, tempo: cfg.tempo });
@@ -1618,9 +1662,9 @@ function abrirConfigSala() {
       mostrarToast('Regras salvas: valem na próxima mão', 3500);
     };
   };
+  document.body.appendChild(fundo); // antes de desenhar: os botões de bots são achados pelo id
   desenhar();
   fundo.addEventListener('pointerdown', (ev) => { if (ev.target === fundo) fundo.remove(); });
-  document.body.appendChild(fundo);
 }
 function confirmarVoto(sim) {
   if (sim === undefined) return;
@@ -2061,6 +2105,7 @@ function receberDoServidor(m) {
     const donoAntes = o.sala && o.sala.dono;
     o.sala = m.sala;
     if (o.souDono !== (m.sala.dono === EU)) { o.souDono = m.sala.dono === EU; guardarSala(); }
+    atualizarBotsConfig();
     atualizarCall();
     const eu = m.sala.assentos.find((a) => a.id === EU);
     if (m.sala.fase === 'espera' || (eu && eu.pendente)) { S.tela = 'espera'; render(); }

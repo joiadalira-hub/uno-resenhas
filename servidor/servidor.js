@@ -225,7 +225,7 @@ class Sala {
       return this.finalizar();
     }
     const tirar = () => { if (saem.length) removerJogadores(e, saem); };
-    const sentar = () => { for (const a of chegam) { adicionarJogador(e, { id: a.id, nome: a.nome }); a.pendente = false; } };
+    const sentar = () => { for (const a of chegam) { adicionarJogador(e, { id: a.id, nome: a.nome, bot: a.tipo === 'bot' }); a.pendente = false; } };
     // a mesa nunca fica com menos de 2 no meio da troca
     if (e.jogadores.length - saem.length >= 2) { tirar(); sentar(); } else { sentar(); tirar(); }
     if (saem.length) {
@@ -460,6 +460,36 @@ function tratar(conexao, msg, ctx) {
     sala.enviarSala();
     for (const h of sala.humanos()) if (h !== assento && h.conexao) h.conexao.enviar({ tipo: 'aviso', curto: true, mensagem: 'O dono mudou as regras da sala: valem a partir da próxima mão.' });
     log('regras mudadas', sala.codigo);
+    return;
+  }
+  // O dono põe ou tira bots na espera ou entre as mãos (quem chega senta na próxima mão)
+  if (tipo === 'bots') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala mexe nos bots.');
+    const entreMaos = sala.e && sala.e.fase !== 'jogando' && sala.fase === 'jogando';
+    if (sala.fase !== 'espera' && !entreMaos) return erro(conexao, 'Espere a mão acabar para mexer nos bots.');
+    const ativos = () => sala.assentos.filter((a) => a.tipo !== 'aberto' && !a.sai && !a.saiu);
+    if (msg.delta > 0) {
+      const saindo = sala.assentos.find((a) => a.tipo === 'bot' && a.sai);
+      if (saindo) { saindo.sai = false; if (sala.votos) sala.votos[saindo.id] = true; } // desfaz uma retirada
+      else if (sala.fase === 'espera') {
+        const i = sala.assentos.findIndex((a) => a.tipo === 'aberto');
+        if (i >= 0) sala.assentos[i] = sala.novoBot(i);
+        else if (sala.assentos.length < 10) sala.assentos.push(sala.novoBot(sala.assentos.length));
+        else return erro(conexao, 'A mesa já tem 10 lugares.');
+      } else {
+        if (ativos().length >= 10) return erro(conexao, 'A mesa já tem 10 lugares.');
+        sala.assentos.push({ ...sala.novoBot(sala.assentos.length), pendente: true });
+      }
+    } else if (msg.delta < 0) {
+      const bots = sala.assentos.filter((a) => a.tipo === 'bot' && !a.sai);
+      const bot = bots.find((a) => a.pendente) || bots[bots.length - 1];
+      if (!bot) return erro(conexao, 'Não há bot para tirar.');
+      if (ativos().length <= 2) return erro(conexao, 'A mesa precisa de pelo menos 2 jogadores.');
+      if (sala.fase === 'espera' || bot.pendente) sala.assentos.splice(sala.assentos.indexOf(bot), 1);
+      else { bot.sai = true; if (sala.votos) sala.votos[bot.id] = false; } // sai quando a mão acabar
+    }
+    sala.capacidade = Math.max(sala.capacidade, ativos().length);
+    sala.enviarSala();
     return;
   }
   if (tipo === 'voto') { if (sala.e) sala.votar(assento.id, msg.sim); return; }

@@ -43,7 +43,7 @@ const servidor = http.createServer((req, res) => {
     // a página do jogo ganha o cabeçalho de site: tela de celular, ícone de app e base "/"
     // (a base faz as cartas carregarem também nos links de sala, /s/CODIGO)
     if (arquivo.endsWith('index.html')) dados = Buffer.concat([Buffer.from(CABECALHO), dados]);
-    res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=86400' });
+    res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': ext === '.html' || arquivo.endsWith('sw.js') ? 'no-cache' : 'public, max-age=86400' });
     res.end(dados);
   });
 });

@@ -308,9 +308,31 @@ function htmlTopo(v, nova) {
   }
   return `<div class="topo-pilha entrou" role="img" aria-label="${alt}"><img class="some-depois" src="cartas/ctrl.webp" alt=""><img class="pinta some-depois" src="cartas/ctrl-${cor}.webp" alt=""><img class="final-vira" src="${final}" alt="">${selo.replace('selo-ctrl', 'selo-ctrl atrasado')}</div>`;
 }
+// Todas as cartas baixadas e prontas antes de precisar delas: a carta que outro jogador joga
+// aparece na hora na pilha e nas animações (antes ela só era baixada na primeira vez que aparecia)
+const CARTAS_PRONTAS = [];
+function todasAsCartas() {
+  const l = ['coringa', 'mais5', 'ctrl', 'verso'];
+  for (const c of CORES) {
+    for (let v = 0; v <= 9; v++) l.push(`${c}-${v}`);
+    for (const t of ['pular', 'reverso', 'mais2']) l.push(`${c}-${t}`);
+    for (const b of ['coringa', 'mais5', 'ctrl']) l.push(`${b}-${c}`);
+  }
+  return l.map((n) => `cartas/${n}.webp`);
+}
 (function preCarregar() {
-  for (const c of CORES) for (const b of ['coringa', 'mais5', 'ctrl']) new Image().src = `cartas/${b}-${c}.webp`;
+  for (const src of todasAsCartas()) {
+    const i = new Image();
+    i.decoding = 'async';
+    i.src = src;
+    if (i.decode) i.decode().catch(() => {});
+    CARTAS_PRONTAS.push(i); // guardadas na memória: o navegador não joga fora
+  }
 })();
+// Cartas e sons ficam guardados no celular (abre mais rápido e gasta menos internet)
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && location.hostname !== 'claude.ai' && !location.hostname.endsWith('.claudeusercontent.com')) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}
 
 function nomeCarta(c) {
   if (c.tipo === 'coringa') return 'Escolher cor';

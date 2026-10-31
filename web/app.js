@@ -51,7 +51,7 @@ document.addEventListener('keydown', iniciarAudio, { capture: true });
 function tocar(nome, vol = 1) {
   if (!S.som) return;
   if (nome === 'carta') { const agora = performance.now(); if (agora - somCartaEm < 45) return; somCartaEm = agora; }
-  const volume = Math.min(1, (VOLUME[nome] ?? 0.85) * vol);
+  const volume = Math.min(1, (VOLUME[nome] ?? 0.85) * vol * S.volJogo);
   if (ctxAudio && ctxAudio.state === 'running' && buffers[nome]) {
     try {
       const fonte = ctxAudio.createBufferSource(), ganho = ctxAudio.createGain();
@@ -76,7 +76,7 @@ const tocarDepois = (nome, ms, vol) => setTimeout(() => tocar(nome, vol), ms);
 const iconeSom = () => S.som
   ? '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>'
   : '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6M22 9l-5 6"/>';
-const botaoSom = () => `<button class="btn btn-icone" id="som" aria-label="${S.som ? 'Desligar sons' : 'Ligar sons'}" aria-pressed="${S.som}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconeSom()}</svg></button>`;
+const botaoSom = () => `<button class="btn btn-icone botao-som ${CALL.ativa ? 'em-call' : ''}" id="som" aria-label="Sons e call" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconeSom()}</svg></button>`;
 // ---------- zoom: (−) e (+) aumentam ou diminuem a tela inteira, de 10 em 10% ----------
 const ZOOM = { valor: ler('ur-zoom', 1) };
 function aplicarZoom() {
@@ -92,16 +92,187 @@ function ligarZoom() {
   if (m) m.onclick = () => mudar(-0.1);
   if (p) p.onclick = () => mudar(0.1);
 }
+// ---------- painel de som: sons do jogo, call de voz e microfone ----------
+function abrirPainelSom(botao) {
+  const velho = document.querySelector('.painel-som');
+  if (velho) { velho.remove(); return; }
+  const r = botao.getBoundingClientRect();
+  const pn = document.createElement('div');
+  pn.className = 'painel-som';
+  pn.setAttribute('role', 'dialog');
+  pn.setAttribute('aria-label', 'Sons e call');
+  pn.style.top = (r.bottom + 8) + 'px';
+  document.body.appendChild(pn);
+  desenharPainelSom();
+  const w = pn.offsetWidth; // alinhado ao botão, mas sempre inteiro na tela
+  pn.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+  const fechar = (ev) => { if (!pn.contains(ev.target) && ev.target.id !== 'som' && !ev.target.closest('#som')) { pn.remove(); document.removeEventListener('pointerdown', fechar, true); } };
+  setTimeout(() => document.addEventListener('pointerdown', fechar, true), 0);
+}
+function desenharPainelSom() {
+  const pn = document.querySelector('.painel-som');
+  if (!pn) return;
+  const online = !!(S.online && S.online.codigo);
+  const naCall = (S.online && S.online.sala ? S.online.sala.assentos.filter((a) => a.naCall) : []).map((a) => a.id === EU ? 'Você' : a.nome).join(', ');
+  pn.innerHTML = `
+    <div class="ps-linha"><span class="ps-titulo">Sons do jogo</span>
+      <label class="chave mini"><input type="checkbox" id="ps-som" ${S.som ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label></div>
+    <input type="range" class="ps-vol" id="ps-vol-jogo" min="0" max="100" value="${Math.round(S.volJogo * 100)}" aria-label="Volume dos sons do jogo" ${S.som ? '' : 'disabled'}>
+    <div class="ps-sep"></div>
+    <div class="ps-linha"><span class="ps-titulo">Call de voz</span>
+      <label class="chave mini"><input type="checkbox" id="ps-call" ${CALL.ativa ? 'checked' : ''} ${online ? '' : 'disabled'}><span class="trilho" aria-hidden="true"></span></label></div>
+    <input type="range" class="ps-vol" id="ps-vol-call" min="0" max="100" value="${Math.round(S.volCall * 100)}" aria-label="Volume da call">
+    <div class="ps-linha"><span>Microfone</span>
+      <button type="button" class="btn ps-mic ${CALL.mic ? '' : 'mudo'}" id="ps-mic" ${CALL.ativa && CALL.stream ? '' : 'disabled'}>${CALL.mic ? 'Ligado' : 'Mudo'}</button></div>
+    <p class="ajuda ps-ajuda">${!online ? 'A call funciona nas salas online.' : CALL.erro ? esc(CALL.erro) : naCall ? 'Na call: ' + esc(naCall) : 'Ninguém na call ainda.'}</p>`;
+  const $ = (id) => document.getElementById(id);
+  $('ps-som').onchange = (ev) => { S.som = ev.target.checked; gravar('ur-som', S.som); if (S.som) tocar('ultima', 0.6); desenharPainelSom(); };
+  $('ps-vol-jogo').oninput = (ev) => { S.volJogo = ev.target.value / 100; gravar('ur-vol-jogo', S.volJogo); };
+  $('ps-vol-jogo').onchange = () => tocar('carta');
+  $('ps-vol-call').oninput = (ev) => { S.volCall = ev.target.value / 100; gravar('ur-vol-call', S.volCall); for (const a of CALL.audios.values()) a.volume = S.volCall; };
+  $('ps-call').onchange = (ev) => { if (ev.target.checked) entrarNaCall(); else sairDaCall(); };
+  $('ps-mic').onclick = () => { CALL.mic = !CALL.mic; aplicarMic(); desenharPainelSom(); };
+}
+
+// ---------- call de voz (WebRTC: o áudio vai direto entre os celulares; o servidor só apresenta) ----------
+const CALL = { ativa: false, mic: true, stream: null, pcs: new Map(), audios: new Map(), filas: new Map(), medidores: new Map(), erro: '' };
+const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+async function entrarNaCall() {
+  if (!S.online || !S.online.codigo) return;
+  iniciarAudio();
+  CALL.erro = '';
+  try {
+    CALL.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  } catch {
+    CALL.stream = null;
+    CALL.erro = 'O microfone foi bloqueado: você só ouve. Libere o microfone para este site e entre de novo.';
+  }
+  CALL.ativa = true; CALL.mic = true;
+  aplicarMic();
+  if (CALL.stream) medirVoz(EU, CALL.stream);
+  enviar({ tipo: 'call', ativo: true });
+  atualizarCall();
+  desenharPainelSom(); atualizarIconeSom();
+}
+function sairDaCall(avisar = true) {
+  if (!CALL.ativa && !CALL.stream) return;
+  CALL.ativa = false;
+  for (const id of [...CALL.pcs.keys()]) fecharPar(id);
+  if (CALL.stream) CALL.stream.getTracks().forEach((t) => t.stop());
+  CALL.stream = null;
+  pararMedidor(EU);
+  if (avisar) enviar({ tipo: 'call', ativo: false });
+  desenharPainelSom(); atualizarIconeSom();
+}
+function aplicarMic() { if (CALL.stream) CALL.stream.getAudioTracks().forEach((t) => { t.enabled = CALL.mic; }); }
+function atualizarIconeSom() { const b = document.getElementById('som'); if (b) b.classList.toggle('em-call', CALL.ativa); }
+// Quem chama quem: só o de id "menor" liga, para os dois não ligarem ao mesmo tempo
+function atualizarCall() {
+  const sala = S.online && S.online.sala;
+  if (!CALL.ativa || !sala) return;
+  const naCall = new Set(sala.assentos.filter((a) => a.naCall && a.id !== EU).map((a) => a.id));
+  for (const id of [...CALL.pcs.keys()]) if (!naCall.has(id)) fecharPar(id);
+  for (const id of naCall) if (!CALL.pcs.has(id) && EU < id) chamar(id);
+  desenharPainelSom();
+}
+function novoPar(id) {
+  fecharPar(id);
+  const pc = new RTCPeerConnection({ iceServers: ICE });
+  if (CALL.stream) CALL.stream.getTracks().forEach((t) => pc.addTrack(t, CALL.stream));
+  else pc.addTransceiver('audio', { direction: 'recvonly' });
+  pc.onicecandidate = (ev) => { if (ev.candidate) enviar({ tipo: 'rtc', para: id, dados: { candidate: ev.candidate.toJSON() } }); };
+  pc.ontrack = (ev) => ouvir(id, ev.streams[0] || new MediaStream([ev.track]));
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'failed') { fecharPar(id); setTimeout(atualizarCall, 1500); }
+  };
+  CALL.pcs.set(id, pc);
+  return pc;
+}
+async function chamar(id) {
+  try {
+    const pc = novoPar(id);
+    await pc.setLocalDescription(await pc.createOffer());
+    enviar({ tipo: 'rtc', para: id, dados: { sdp: pc.localDescription.toJSON() } });
+  } catch { fecharPar(id); }
+}
+async function receberRtc(m) {
+  if (!CALL.ativa) return;
+  const { de, dados } = m;
+  try {
+    if (dados.sdp && dados.sdp.type === 'offer') {
+      const pc = novoPar(de);
+      await pc.setRemoteDescription(dados.sdp);
+      await pc.setLocalDescription(await pc.createAnswer());
+      enviar({ tipo: 'rtc', para: de, dados: { sdp: pc.localDescription.toJSON() } });
+      await soltarCandidatos(de);
+    } else if (dados.sdp && dados.sdp.type === 'answer') {
+      const pc = CALL.pcs.get(de);
+      if (pc && pc.signalingState === 'have-local-offer') { await pc.setRemoteDescription(dados.sdp); await soltarCandidatos(de); }
+    } else if (dados.candidate) {
+      const pc = CALL.pcs.get(de);
+      if (pc && pc.remoteDescription) await pc.addIceCandidate(dados.candidate);
+      else { if (!CALL.filas.has(de)) CALL.filas.set(de, []); CALL.filas.get(de).push(dados.candidate); }
+    }
+  } catch { /* uma negociação perdida: a próxima atualização da sala refaz */ }
+}
+async function soltarCandidatos(id) {
+  const pc = CALL.pcs.get(id), fila = CALL.filas.get(id) || [];
+  CALL.filas.delete(id);
+  for (const c of fila) { try { await pc.addIceCandidate(c); } catch { /* candidato velho */ } }
+}
+function ouvir(id, stream) {
+  let a = CALL.audios.get(id);
+  if (!a) { a = document.createElement('audio'); a.autoplay = true; a.setAttribute('playsinline', ''); a.className = 'audio-call'; document.body.appendChild(a); CALL.audios.set(id, a); }
+  a.srcObject = stream; a.volume = S.volCall;
+  const p = a.play(); if (p) p.catch(() => {});
+  medirVoz(id, stream);
+}
+function fecharPar(id) {
+  const pc = CALL.pcs.get(id);
+  if (pc) { pc.onconnectionstatechange = null; try { pc.close(); } catch { /* já fechado */ } }
+  CALL.pcs.delete(id); CALL.filas.delete(id);
+  const a = CALL.audios.get(id);
+  if (a) { a.srcObject = null; a.remove(); }
+  CALL.audios.delete(id);
+  pararMedidor(id);
+}
+// Quem está falando: a foto ganha um brilho enquanto a voz passa de um certo volume
+function medirVoz(id, stream) {
+  pararMedidor(id);
+  if (!ctxAudio) return;
+  try {
+    const fonte = ctxAudio.createMediaStreamSource(stream);
+    const an = ctxAudio.createAnalyser(); an.fftSize = 512;
+    fonte.connect(an);
+    const dados = new Uint8Array(an.fftSize);
+    const timer = setInterval(() => {
+      an.getByteTimeDomainData(dados);
+      let soma = 0; for (const v of dados) soma += (v - 128) * (v - 128);
+      const falando = Math.sqrt(soma / dados.length) > 6 && (id !== EU || CALL.mic);
+      const el = id === EU ? document.querySelector('.eu-canto') : document.querySelector(`.assento[data-id="${id}"]`);
+      if (el) el.classList.toggle('falando', falando);
+    }, 150);
+    CALL.medidores.set(id, { timer, fonte });
+  } catch { /* sem medidor */ }
+}
+function pararMedidor(id) {
+  const m = CALL.medidores.get(id);
+  if (m) { clearInterval(m.timer); try { m.fonte.disconnect(); } catch { /* ok */ } }
+  CALL.medidores.delete(id);
+}
+
 function ligarBotaoSom() {
   ligarZoom();
   const b = document.getElementById('som');
-  if (b) b.onclick = () => { S.som = !S.som; gravar('ur-som', S.som); if (S.som) tocar('ultima', 0.6); render(); };
+  if (b) b.onclick = (ev) => { ev.stopPropagation(); abrirPainelSom(b); };
 }
 const S = {
   tela: 'inicio',
   apelido: ler('ur-apelido', ''),
   avatar: ler('ur-avatar', null),
   som: ler('ur-som', true),
+  volJogo: ler('ur-vol-jogo', 1),
+  volCall: ler('ur-vol-call', 1),
   config: ler('ur-config', { lugares: 6, fimModo: 'rodadas', fimValor: 5, tempo: 20, opcoes: { ...OPCOES_PADRAO } }),
   e: null,
   ui: null,
@@ -437,6 +608,7 @@ function chegouCarta(id) {
   el.classList.toggle('uma', n === 1);
   ajustarLeque(el.querySelector('.leque'), n);
 }
+const estaNaCall = (id) => !!(S.online && S.online.sala && S.online.sala.assentos.some((a) => a.id === id && a.naCall));
 const caiuDaSala = (id) => !!(S.online && S.online.sala && S.online.sala.assentos.some((a) => a.id === id && a.tipo === 'humano' && !a.conectado));
 const CORES_JOG = ['#FF7A59', '#5BC0FF', '#B48CFF', '#4FD1A5', '#FFB547', '#FF6FB5', '#7BD389', '#F2C94C', '#6FA8FF'];
 function corDoJogador(id) {
@@ -505,7 +677,7 @@ function telaMesa() {
     </div>
     <div class="arena" ${fixo ? `style="flex:none;height:${fixo.h}px"` : ''}>
       <div class="feltro" aria-hidden="true"></div>
-      ${assentos.map(({ j, x, y }) => `<div class="assento ${j.id === v.vez ? 'vez' : ''} ${caiuDaSala(j.id) ? 'caiu' : ''} ${cartasVisiveis(j) === 1 ? 'uma' : ''} ${v.regra9 && v.regra9.apertaram.includes(j.id) ? 'apertou9' : ''}" data-id="${j.id}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;--cor-jog:${corDoJogador(j.id)}">
+      ${assentos.map(({ j, x, y }) => `<div class="assento ${j.id === v.vez ? 'vez' : ''} ${caiuDaSala(j.id) ? 'caiu' : ''} ${estaNaCall(j.id) ? 'na-call' : ''} ${cartasVisiveis(j) === 1 ? 'uma' : ''} ${v.regra9 && v.regra9.apertaram.includes(j.id) ? 'apertou9' : ''}" data-id="${j.id}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;--cor-jog:${corDoJogador(j.id)}">
         ${j.id === v.vez ? '<span class="selo-vez">Jogando</span>' : ''}
         <div class="leque" aria-hidden="true">${leque(cartasVisiveis(j))}</div>
         <span class="avatar">${htmlAvatar(j)}<span class="contagem" aria-label="${cartasVisiveis(j)} cartas">${cartasVisiveis(j)}</span></span>
@@ -551,7 +723,7 @@ function telaMesa() {
     </div>
     <p class="aviso ${ui.erro ? 'erro' : ''}" role="status">${esc(ui.aviso)}</p>
     <div class="base-mesa">
-      <div class="eu-canto ${vez ? 'vez' : ''}" style="--cor-jog:${corDoJogador(EU)}">
+      <div class="eu-canto ${vez ? 'vez' : ''} ${CALL.ativa ? 'na-call' : ''}" style="--cor-jog:${corDoJogador(EU)}">
         ${vez ? '<span class="selo-vez">Sua vez!</span>' : ''}
         <span class="avatar eu-avatar">${htmlAvatar({ id: EU, nome: S.apelido || 'Você' })}</span>
         <span class="placa">${esc(S.apelido || 'Você')}</span>
@@ -1651,7 +1823,10 @@ function conectar(aoAbrir) {
   o.ws = ws;
   ws.onopen = () => {
     o.tentativas = 0; o.caiu = false; o.ultimaMsg = Date.now();
-    if (o.codigo) enviar({ tipo: 'entrar', codigo: o.codigo, token: o.token, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha });
+    if (o.codigo) {
+      enviar({ tipo: 'entrar', codigo: o.codigo, token: o.token, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha });
+      if (CALL.ativa) enviar({ tipo: 'call', ativo: true }); // voltou da queda: continua na call
+    }
     else if (o.primeiro) o.primeiro();
     const fila = o.fila; o.fila = [];
     fila.forEach((m) => ws.send(JSON.stringify(m)));
@@ -1715,6 +1890,8 @@ function entrarNaSala(codigo, senha) {
   S.online.senha = senha;
 }
 function sairDaSala() {
+  sairDaCall();
+  document.querySelectorAll('.painel-som').forEach((x) => x.remove());
   const o = S.online;
   if (o) { o.saindo = true; enviar({ tipo: 'sair' }); setTimeout(() => o.ws && o.ws.close(), 200); }
   gravar('ur-sala', null);
@@ -1736,6 +1913,7 @@ function receberDoServidor(m) {
   if (m.tipo === 'sala') {
     const donoAntes = o.sala && o.sala.dono;
     o.sala = m.sala;
+    atualizarCall();
     const eu = m.sala.assentos.find((a) => a.id === EU);
     if (m.sala.fase === 'espera' || (eu && eu.pendente)) { S.tela = 'espera'; render(); }
     else if (m.sala.fase === 'final') { if (S.e && S.tela !== 'arte') { document.querySelectorAll('.palco, .vitoria-show').forEach((x) => x.remove()); S.arteDe = 'final'; S.tela = 'arte'; render(); } }
@@ -1744,6 +1922,7 @@ function receberDoServidor(m) {
     return;
   }
   if (m.tipo === 'removido') { S.erroInicio = 'Você saiu da mesa.'; return sairDaSala(); }
+  if (m.tipo === 'rtc') return receberRtc(m);
   if (m.tipo === 'estado') return receberEstado(m);
   if (m.tipo === 'erro') {
     if (o.codigo && /não encontrada/i.test(m.mensagem)) { S.erroInicio = 'Essa sala fechou (o servidor reiniciou ou ficou parado). Crie outra.'; return sairDaSala(); }
@@ -1859,6 +2038,7 @@ function telaEspera() {
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
         <span class="ajuda" style="font-size:13px">Sala ${esc(sala.codigo)}${sala.temSenha ? ' · com senha' : ''}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
+      <span style="margin-left:auto">${botaoSom()}</span>
     </div>
     <section class="bloco">
       <span class="rotulo">Convite</span>
@@ -1886,6 +2066,7 @@ function telaEspera() {
       : '<p class="aviso" style="margin-top:auto">Esperando quem criou a sala começar…</p>'}
   </main>`;
   document.getElementById('sair-espera').onclick = sairDaSala;
+  ligarBotaoSom();
   document.getElementById('copiar').onclick = async (ev) => {
     const b = ev.currentTarget;
     try { await navigator.clipboard.writeText(link); b.textContent = 'Copiado!'; }
@@ -1907,6 +2088,7 @@ function telaProximaMao(sala, link) {
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
         <span class="ajuda" style="font-size:13px">Sala aberta ${esc(sala.codigo)}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
+      <span style="margin-left:auto">${botaoSom()}</span>
     </div>
     <div class="bloco" style="align-items:center;text-align:center;gap:8px">
       <span class="avatar-grande" style="cursor:default;border-style:solid">${S.avatar ? `<img src="${S.avatar}" alt="">` : `<span>${esc((S.apelido || '?')[0].toUpperCase())}</span>`}</span>
@@ -1923,6 +2105,7 @@ function telaProximaMao(sala, link) {
     <button class="btn" id="copiar" style="margin-top:auto">Copiar link da sala</button>
   </main>`;
   document.getElementById('sair-espera').onclick = sairDaSala;
+  ligarBotaoSom();
   document.getElementById('copiar').onclick = async (ev) => { try { await navigator.clipboard.writeText(link); ev.currentTarget.textContent = 'Copiado!'; } catch { ev.currentTarget.textContent = link; } };
 }
 

@@ -120,7 +120,7 @@ class Sala {
   resumo() {
     return {
       codigo: this.codigo, nome: this.nome, temSenha: !!this.senha, dono: this.dono, fase: this.fase, config: this.config, votos: this.votos,
-      assentos: this.assentos.map((a) => ({ id: a.id, tipo: a.tipo, nome: a.nome, avatar: a.avatar || null, conectado: a.tipo !== 'humano' || a.conectado, pendente: !!a.pendente, sai: !!(a.saiu || a.sai) })),
+      assentos: this.assentos.map((a) => ({ id: a.id, tipo: a.tipo, nome: a.nome, avatar: a.avatar || null, conectado: a.tipo !== 'humano' || a.conectado, pendente: !!a.pendente, sai: !!(a.saiu || a.sai), naCall: !!(a.naCall && a.conectado) })),
     };
   }
   enviarSala() { for (const h of this.humanos()) if (h.conexao) h.conexao.enviar({ tipo: 'sala', sala: this.resumo() }); }
@@ -329,6 +329,7 @@ class Sala {
   caiu(assento) {
     assento.conectado = false;
     assento.conexao = null;
+    assento.naCall = false;
     if (this.fase === 'espera') {
       // celular que troca de app derruba a conexão: o lugar (e o posto de dono) fica guardado
       this.enviarSala();
@@ -435,6 +436,13 @@ function tratar(conexao, msg, ctx) {
     const acao = { ...(msg.acao || {}), jogador: assento.id };
     if (['tempo9', 'proxima_rodada'].includes(acao.tipo)) return;
     try { sala.agir(acao, assento.id); } catch (err) { erro(conexao, err.message); }
+    return;
+  }
+  // Call de voz: o servidor só apresenta os celulares (WebRTC); o áudio vai direto de um para o outro
+  if (tipo === 'call') { assento.naCall = !!msg.ativo; sala.enviarSala(); return; }
+  if (tipo === 'rtc') {
+    const outro = sala.humanos().find((h) => h.id === msg.para && h.conexao);
+    if (outro && msg.dados && typeof msg.dados === 'object') outro.conexao.enviar({ tipo: 'rtc', de: assento.id, dados: msg.dados });
     return;
   }
   if (tipo === 'voto') { if (sala.e) sala.votar(assento.id, msg.sim); return; }

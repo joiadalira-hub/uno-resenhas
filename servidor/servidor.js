@@ -290,7 +290,7 @@ class Sala {
       const troca = (r.eventos || []).some((ev) => ev.tipo === 'troca');
       if (troca) t = Math.max(350, t) + 1900; // TROCOU!
       const ator = this.e.jogadores.find((j) => j.id === evento.acao.jogador);
-      if (ator && ator.mao.length === 1 && !troca) t = Math.max(350, t) + 1500; // ÚLTIMA! ou ESQUECEU!
+      if (ator && ator.mao.length === 1 && !troca && this.e.vulneravel !== ator.id) t = Math.max(350, t) + 1500; // ÚLTIMA! (quem esqueceu não tem animação)
     }
     const compradas = r && r.compradas ? r.compradas.length : 0;
     if (compradas) {
@@ -300,6 +300,8 @@ class Sala {
       t = Math.max(t, forcada ? Math.max(1500, voo + 400) : voo); // +N na tela de todos
     }
     if (evento.acao && evento.acao.tipo === 'desafiar') t = Math.max(t, 2000);
+    if (evento.acao && evento.acao.tipo === 'pegou') t = Math.max(t, 1700); // ESQUECEU! + as cartas
+    if (evento.acao && evento.acao.tipo === 'ultima' && this.e.fase === 'jogando') { const j = this.e.jogadores.find((x) => x.id === evento.acao.jogador); if (j && j.mao.length === 1) t = Math.max(t, 1500); } // ÚLTIMA! atrasado
     return t;
   }
 

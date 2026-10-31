@@ -1084,15 +1084,15 @@ function posAcao(acao, r, jogada, antes) {
     setTimeout(() => { if (S.e) mostrarTroca(de, com); }, atraso);
     ui.comboAte = Date.now() + atraso + DURACAO_TROCA;
   }
-  // Ficou com 1 carta: ÚLTIMA! (avisou) ou ESQUECEU! (os outros podem apertar "Pegou!")
-  if ((acao.tipo === 'jogar' || acao.tipo === 'corte') && S.e.fase === 'jogando' && !troca) {
-    const ator = S.e.jogadores.find((j) => j.id === acao.jogador);
-    if (ator && ator.mao.length === 1) {
-      const disse = S.e.vulneravel !== ator.id;
-      const atraso = Math.max(350, (ui.comboAte || 0) - Date.now());
-      setTimeout(() => { if (S.e) mostrarUltima(ator.id, disse); }, atraso);
-      ui.comboAte = Date.now() + atraso + DURACAO_ULTIMA;
-    }
+  // Ficou com 1 carta avisando (antes de jogar, ou apertando "Última!" logo depois, antes de alguém pegar): ÚLTIMA!
+  // Quem esquece não ganha animação nenhuma: o ESQUECEU! só aparece se alguém de fato pegar ("Pegou!").
+  const ator1 = S.e.fase === 'jogando' && S.e.jogadores.find((j) => j.id === acao.jogador);
+  const avisouAgora = acao.tipo === 'ultima' && ator1 && ator1.mao.length === 1;
+  const jogouAvisado = (acao.tipo === 'jogar' || acao.tipo === 'corte') && !troca && ator1 && ator1.mao.length === 1 && S.e.vulneravel !== ator1.id;
+  if (avisouAgora || jogouAvisado) {
+    const atraso = avisouAgora ? Math.max(0, (ui.comboAte || 0) - Date.now()) : Math.max(350, (ui.comboAte || 0) - Date.now());
+    setTimeout(() => { if (S.e) mostrarUltima(ator1.id, true); }, atraso);
+    ui.comboAte = Date.now() + atraso + DURACAO_ULTIMA;
   }
   if (acao.jogador === EU && acao.tipo === 'comprar' && r.podeJogar) ui.aviso = 'Você comprou uma carta que serve: jogue-a ou passe';
   // compras: uma carta por vez saindo do monte até quem comprou
@@ -1113,6 +1113,12 @@ function posAcao(acao, r, jogada, antes) {
   const forcada = (acao.tipo === 'comprar' && antes.pendente) || acao.tipo === 'pegou' || acao.tipo === 'desafiar';
   if (forcada && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     for (const [id, d] of compras) {
+      if (acao.tipo === 'pegou') { // ESQUECEU!: só quando alguém pega de verdade, junto com as 2 cartas
+        const dur = Math.max(1700, duracaoCompra(d) + 500);
+        mostrarUltima(id, false, `${nomeJog(acao.jogador).replace('Bot ', '')} pegou! +${d} cartas`, dur);
+        ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + dur);
+        continue;
+      }
       const sub = acao.tipo === 'pegou' ? 'Não disse Última!' : acao.tipo === 'desafiar' ? (r.resultado === 'ilegal' ? 'Desafio certo: o +5 era ilegal' : 'Desafio errado: +2 de castigo') : `Comprou ${d} ${d === 1 ? 'carta' : 'cartas'}`;
       const dur = Math.max(1500, duracaoCompra(d) + 400);
       mostrarCompraForcada(id, d, sub, dur);
@@ -1138,7 +1144,7 @@ function somDaAcao(acao, r, jogada, combo, antes) {
   // +2/+5: o som de ataque sai quando a compra acontece (quem levou compra as cartas)
   if (acao.tipo === 'comprar' && antes && antes.pendente) tocar('ataque');
   if (acao.tipo === 'desafiar') tocarDepois('ataque', 260);
-  if (acao.tipo === 'ultima') tocar('ultima');
+  if (acao.tipo === 'ultima' && !(S.e && (S.e.jogadores.find((j) => j.id === acao.jogador) || { mao: [] }).mao.length === 1)) tocar('ultima'); // com 1 carta o som vem com a animação
   if (acao.tipo === 'pegou') tocar('pegou');
   if (acao.tipo === 'desafiar') tocar(r.resultado === 'ilegal' ? 'pegou' : 'erro');
   if (acao.tipo === 'apertar9') tocar('apertou'); // cada um que aperta o (9) faz o som, para todos
@@ -1511,17 +1517,17 @@ function mostrarTroca(a, b) {
 
 // ---------- ÚLTIMA! / ESQUECEU! quando alguém fica com uma carta ----------
 const DURACAO_ULTIMA = 1500;
-function mostrarUltima(id, disse) {
+function mostrarUltima(id, disse, subPegou, dur = DURACAO_ULTIMA) {
   const p = criarPalco('ultima-show ' + (disse ? 'disse' : 'esqueceu'), disse ? `${nomeJog(id)}: Última!` : `${nomeJog(id)} esqueceu de dizer Última`);
   if (!p) return;
   const { palco, area } = p;
   const eu = id === EU;
-  const sub = disse ? 'Só falta 1 carta' : eu ? 'Você não disse Última!' : 'Não disse Última! Aperte "Pegou!"';
+  const sub = disse ? 'Só falta 1 carta' : subPegou || (eu ? 'Você não disse Última!' : 'Não disse Última!');
   area.innerHTML = `<div class="efeito-col">${htmlCabecalho(id, disse ? 'ÚLTIMA!' : 'ESQUECEU!', sub)}
     <div class="ultima-carta"><span class="verso"></span></div></div>`;
   tocar(disse ? 'ultima' : 'erro');
-  setTimeout(() => palco.classList.add('sai'), DURACAO_ULTIMA - 350);
-  setTimeout(() => palco.remove(), DURACAO_ULTIMA);
+  setTimeout(() => palco.classList.add('sai'), dur - 350);
+  setTimeout(() => palco.remove(), dur);
 }
 
 // ---------- animação do Pular: a vez salta por cima dos bloqueados ----------

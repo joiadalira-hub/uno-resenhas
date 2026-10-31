@@ -2507,6 +2507,7 @@ document.addEventListener('fullscreenchange', () => {
 aplicarZoom();
 // Verso das cartas: usa a arte do verso do deck escolhido
 function carregarVerso() {
+  document.body.classList.toggle('deck-min', PASTA === 'cartas-min');
   const i = new Image();
   i.onload = () => { document.body.style.setProperty('--verso-url', `url(${PASTA}/verso.webp)`); document.body.classList.add('tem-verso'); };
   i.onerror = () => document.body.classList.remove('tem-verso');

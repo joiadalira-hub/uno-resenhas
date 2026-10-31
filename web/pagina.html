@@ -76,6 +76,16 @@ h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
 /* verso das cartas: a arte "fundo das cartas" quando existir; senão, um verso escuro com UR */
 .verso { background: #0B0F1E center / cover no-repeat; border: 2px solid #fff; }
 body.tem-verso .verso { background-image: var(--verso-url); }
+/* Deck Minimalista: a carta vai até a borda (sem moldura branca), então o canto arredondado
+   aparece mais. O raio menor deixa o formato igual ao que se vê no deck Clássico. */
+body.deck-min .carta, body.deck-min .carta img { border-radius: calc(var(--cw, 76px) * 0.055); }
+body.deck-min .topo-pilha, body.deck-min .topo-pilha img { border-radius: calc(var(--cw-topo) * 0.055); }
+body.deck-min .combo-carta img { border-radius: calc(var(--cw) * 0.055); }
+body.deck-min .monte { border-radius: calc(var(--cw-topo) * 0.05); }
+body.deck-min .voo { border-radius: 5px; }
+body.deck-min .verso.mini { border-radius: 2px; }
+body.deck-min .espiadas img { border-radius: 3px; }
+body.deck-min .ultima-carta .verso { border-radius: 5px; }
 /* escolha do deck */
 .decks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .deck-op { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 8px; border-radius: 14px; border: 2px solid var(--borda); background: var(--chao); color: var(--texto); cursor: pointer; }

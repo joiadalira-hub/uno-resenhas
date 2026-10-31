@@ -1582,6 +1582,11 @@ function depoisDeMudar() {
   if (atual.bot) {
     ui.prazo = 0;
     timerBot = setTimeout(() => agir(escolherAcao(S.e, atual.id)), Math.max(animando ? (topo.tipo === 'ctrl' ? 3000 : 2600) : 1900, esperaCombo + 700));
+  } else if (e.compraPendente && !e.ultimoMais5 && jogadasPossiveis(e, EU).length === 0) {
+    // levou +2/+5 sem ter como responder nem desafiar: compra sozinho (não há o que decidir)
+    ui.prazo = 0;
+    ui.aviso = `Sem resposta para o ${e.compraPendente.tipo}: comprando ${e.compraPendente.quantidade}…`; ui.erro = false;
+    timerBot = setTimeout(() => { if (S.e === e && minhaVez() && S.e.compraPendente) agir({ tipo: 'comprar', jogador: EU }); }, Math.max(1100, esperaCombo + 900));
   } else {
     if (ui.vezAnterior !== EU) tocarDepois('sua-vez', Math.max(0, esperaCombo - 200));
     const tempo = S.config.tempo;
@@ -1608,7 +1613,9 @@ function depoisDeMudarOnline(esperaCombo) {
   const atual = e.jogadores[e.vez];
   const vezAntes = ui.vezAnterior;
   ui.prazo = 0;
-  if (!e.regra9 && atual.id === EU) {
+  if (!e.regra9 && atual.id === EU && e.compraPendente && !e.ultimoMais5 && jogadasPossiveis(e, EU).length === 0) {
+    ui.aviso = `Sem resposta para o ${e.compraPendente.tipo}: comprando ${e.compraPendente.quantidade}…`; ui.erro = false; // o servidor compra sozinho
+  } else if (!e.regra9 && atual.id === EU) {
     if (vezAntes !== EU) tocarDepois('sua-vez', Math.max(0, esperaCombo - 200));
     if (ui.prazoServidor) {
       ui.prazo = Date.now() + ui.prazoServidor;

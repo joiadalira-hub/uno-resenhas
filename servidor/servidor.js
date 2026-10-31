@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomInt, createHash } from 'node:crypto';
 import { aceitarUpgrade } from './ws.js';
-import { novaPartida, aplicar, visaoDe, resolverSequencia, removerJogadores, adicionarJogador } from '../motor/regras.js';
+import { novaPartida, aplicar, visaoDe, resolverSequencia, jogadasPossiveis, removerJogadores, adicionarJogador } from '../motor/regras.js';
 import { escolherAcao } from '../motor/bot.js';
 
 const PORTA = Number(process.env.PORT) || 3000;
@@ -325,6 +325,9 @@ class Sala {
     const atual = e.jogadores[e.vez];
     if (atual.bot) {
       this.depois(Math.max(1900, espera + 700), () => { const a = escolherAcao(this.e, atual.id); this.agir(a, atual.id); });
+    } else if (semSaida(e, atual.id)) {
+      // levou +2/+5 e não tem nada para responder nem para desafiar: compra sozinho
+      this.depois(espera + 900, () => { if (this.e.jogadores[this.e.vez].id === atual.id && semSaida(this.e, atual.id)) this.agir({ tipo: 'comprar', jogador: atual.id }, 'automatico'); });
     } else if (this.config.tempo) {
       const ms = espera + this.config.tempo * 1000;
       this.prazoAte = Date.now() + ms;
@@ -383,6 +386,11 @@ class Sala {
     assento.conectado = true;
     if (this.e) { const j = this.e.jogadores.find((x) => x.id === assento.id); if (j) j.bot = false; }
   }
+}
+
+// Compra acumulada sem nenhuma carta para responder e sem +5 para desafiar: não há o que decidir
+function semSaida(e, id) {
+  return !!(e.compraPendente && !e.regra9 && !e.ultimoMais5 && jogadasPossiveis(e, id).length === 0);
 }
 
 // O que cada jogador pode saber de um evento: as cartas compradas pelos outros não vão para ele

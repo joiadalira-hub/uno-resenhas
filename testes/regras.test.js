@@ -278,3 +278,13 @@ test('sala aberta: quem chega entra na próxima mão e as mãos jogadas são con
   const p = placar(e).find((x) => x.jogador === 'novo');
   assert.deepEqual([p.pontos, p.maos], [0, 0]);
 });
+
+test('bater no corte: opcional', () => {
+  for (const pode of [true, false]) {
+    const e = mesa({ maos: [extras(), [N('azul', 4)], extras()], topo: N('azul', 4), opcoes: { corte: true, baterNoCorte: pode } });
+    e.disseUltima.j2 = true;
+    const id = e.jogadores[1].mao[0].id;
+    if (pode) { const r = aplicar(e, { tipo: 'corte', jogador: 'j2', cartas: [id] }); assert.ok(r.fimDeRodada); }
+    else assert.throws(() => aplicar(e, { tipo: 'corte', jogador: 'j2', cartas: [id] }), /bater no corte/);
+  }
+});

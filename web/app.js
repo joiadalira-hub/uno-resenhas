@@ -11,6 +11,7 @@ const REGRAS_OPCIONAIS = [
   ['mais2NaoRespondeMais5', '+2 não responde a +5', 'Só +5 ou Ctrl+C defendem um +5'],
   ['vencerComEspecial', 'Vencer com carta especial', 'Libera vencer com coringa ou ação'],
   ['corte', 'Corte', 'Carta idêntica ao topo joga fora da vez'],
+  ['baterNoCorte', 'Bater no corte', 'Com o Corte ligado: dá para ganhar cortando com a última carta'],
   ['comprarAtePoder', 'Comprar até poder jogar', 'Compra até achar uma carta válida'],
   ['morteSubita', 'Morte súbita', 'O monte acaba 2 vezes: fim da rodada'],
   ['regraDo5', 'Regra do 5', 'Jogar um 5 escolhe a próxima cor'],

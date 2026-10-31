@@ -471,7 +471,7 @@ function tratar(conexao, msg, ctx) {
   if (tipo === 'config') {
     if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala muda as regras.');
     if (sala.fase !== 'espera' && !(sala.e && sala.e.fase !== 'jogando')) return erro(conexao, 'Espere a mão acabar para mudar as regras.');
-    const PERMITIDAS = ['acumularCompras', 'mais2NaoRespondeMais5', 'mais5SobreMais2', 'vencerComEspecial', 'corte', 'comprarAtePoder', 'morteSubita', 'regraDo5', 'regraDo9'];
+    const PERMITIDAS = ['acumularCompras', 'mais2NaoRespondeMais5', 'mais5SobreMais2', 'vencerComEspecial', 'corte', 'baterNoCorte', 'comprarAtePoder', 'morteSubita', 'regraDo5', 'regraDo9'];
     const novas = {};
     for (const k of PERMITIDAS) if (msg.opcoes && typeof msg.opcoes[k] === 'boolean') novas[k] = msg.opcoes[k];
     sala.config.opcoes = { ...sala.config.opcoes, ...novas };

@@ -10,6 +10,7 @@ export const OPCOES_PADRAO = {
   mais5SobreMais2: true,      // um +2 pode ser respondido com +5
   vencerComEspecial: false,   // libera vencer com coringa ou carta de ação
   corte: false,               // jogar carta idêntica fora da vez
+  baterNoCorte: true,         // com o Corte ligado: pode bater (ganhar) cortando com a última carta
   comprarAtePoder: false,     // sem carta válida, compra até achar
   morteSubita: false,         // monte acabou pela 2ª vez: rodada termina
   regraDo5: false,            // jogar um 5 escolhe a próxima cor
@@ -185,6 +186,7 @@ function checarJogada(e, idJogador, idsCartas, { foraDaVez }) {
 
   // Só se vence com números
   const vence = cartas.length === j.mao.length;
+  if (vence && foraDaVez && e.opcoes.baterNoCorte === false) throw new ErroJogada('bater_corte', 'Nesta sala não dá para bater no corte');
   if (vence && !e.opcoes.vencerComEspecial && cartas.some((c) => c.tipo !== 'num')) {
     throw new ErroJogada('vitoria_especial', 'Só dá para vencer com cartas de número');
   }

@@ -114,7 +114,10 @@ function desenharPainelVisual() {
   if (!pn) return;
   pn.innerHTML = AJUSTES.map(([k, , nome, ajuda]) => `<div class="ps-linha"><span style="display:flex;flex-direction:column"><span class="ps-titulo">${nome}</span><span class="ajuda">${ajuda}</span></span>
     <div class="passo"><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="-1" aria-label="Diminuir ${nome}" ${ZOOM[k] <= 0.6 ? 'disabled' : ''}>−</button><span style="min-width:52px;font-size:17px">${Math.round(ZOOM[k] * 100)}%</span><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="1" aria-label="Aumentar ${nome}" ${ZOOM[k] >= 1.6 ? 'disabled' : ''}>+</button></div></div>`).join('')
-    + '<button type="button" class="link" id="aj-padrao" style="align-self:center">Voltar ao padrão</button>';
+    + '<button type="button" class="link" id="aj-padrao" style="align-self:center">Voltar ao padrão</button>'
+    + `<div class="ps-sep"></div><span class="ps-titulo">Deck das cartas</span>${htmlEscolhaDeck()}`;
+  ligarEscolhaDeck(pn);
+  pn.querySelectorAll('[data-deck]').forEach((b) => b.addEventListener('click', () => setTimeout(desenharPainelVisual, 0)));
   pn.querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => mudarAjuste(b.dataset.aj, Number(b.dataset.d) * 0.1)));
   pn.querySelector('#aj-padrao').onclick = () => { for (const [k, chave] of AJUSTES) { ZOOM[k] = 1; gravar(chave, 1); } aplicarZoom(); render(); desenharPainelVisual(); };
 }
@@ -325,6 +328,7 @@ const S = {
   apelido: ler('ur-apelido', ''),
   avatar: ler('ur-avatar', null),
   som: ler('ur-som', true),
+  deck: ler('ur-deck', 'classico'),
   volJogo: ler('ur-vol-jogo', 1),
   volCall: ler('ur-vol-call', 1),
   config: ler('ur-config', { lugares: 6, fimModo: 'rodadas', fimValor: 5, tempo: 20, opcoes: { ...OPCOES_PADRAO } }),
@@ -339,12 +343,29 @@ function novaUI() {
 }
 
 // ---------- utilidades de carta ----------
+// ---------- decks: cada jogador escolhe o seu (só muda o desenho no próprio aparelho) ----------
+const DECKS = [['classico', 'Clássico', 'cartas'], ['minimalista', 'Minimalista', 'cartas-min']];
+let PASTA = (DECKS.find((d) => d[0] === S.deck) || DECKS[0])[2];
+function trocarDeck(id) {
+  const d = DECKS.find((x) => x[0] === id) || DECKS[0];
+  const ap = document.getElementById('apelido'); if (ap) S.apelido = ap.value; // não perde o que foi digitado
+  S.deck = d[0]; gravar('ur-deck', S.deck);
+  PASTA = d[2];
+  preCarregarDeck();
+  carregarVerso();
+  render();
+}
+const htmlEscolhaDeck = () => `<div class="decks" role="group" aria-label="Deck das cartas">${DECKS.map(([id, nome, pasta]) => `<button type="button" class="deck-op" data-deck="${id}" aria-pressed="${S.deck === id}">
+    <span class="deck-mini"><img src="${pasta}/azul-7.webp" alt=""><img src="${pasta}/coringa.webp" alt=""><img src="${pasta}/vermelho-reverso.webp" alt=""></span><b>${nome}</b></button>`).join('')}</div>`;
+function ligarEscolhaDeck(raiz = document) {
+  raiz.querySelectorAll('[data-deck]').forEach((b) => (b.onclick = () => { if (S.deck !== b.dataset.deck) trocarDeck(b.dataset.deck); }));
+}
 function imgCarta(c) {
-  if (c.tipo === 'coringa') return 'cartas/coringa.webp';
-  if (c.tipo === '+5') return 'cartas/mais5.webp';
-  if (c.tipo === 'ctrl') return 'cartas/ctrl.webp';
-  if (c.tipo === 'num') return `cartas/${c.cor}-${c.valor}.webp`;
-  return `cartas/${c.cor}-${{ pular: 'pular', reverso: 'reverso', '+2': 'mais2' }[c.tipo]}.webp`;
+  if (c.tipo === 'coringa') return `${PASTA}/coringa.webp`;
+  if (c.tipo === '+5') return `${PASTA}/mais5.webp`;
+  if (c.tipo === 'ctrl') return `${PASTA}/ctrl.webp`;
+  if (c.tipo === 'num') return `${PASTA}/${c.cor}-${c.valor}.webp`;
+  return `${PASTA}/${c.cor}-${{ pular: 'pular', reverso: 'reverso', '+2': 'mais2' }[c.tipo]}.webp`;
 }
 // Carta do topo com animação: o preto do coringa se pinta com a cor escolhida;
 // o Ctrl+C se pinta e depois vira a carta que ele copiou.
@@ -354,13 +375,13 @@ function htmlTopo(v, nova) {
   const fisica = v.cartaDoTopo, ef = v.topo, cor = v.corAtual;
   const alt = `Topo: ${esc(nomeCarta(fisica))}${fisica.tipo === 'ctrl' ? ' virou ' + esc(nomeCarta(ef)) : ''}`;
   if (!ehPreta(fisica.tipo)) return `<div class="topo-pilha ${nova ? 'entrou' : ''}" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""></div>`;
-  const final = ehPreta(ef.tipo) ? `cartas/${baseCoringa(ef.tipo)}-${cor}.webp` : imgCarta({ tipo: ef.tipo, cor: ef.cor, valor: ef.valor });
+  const final = ehPreta(ef.tipo) ? `${PASTA}/${baseCoringa(ef.tipo)}-${cor}.webp` : imgCarta({ tipo: ef.tipo, cor: ef.cor, valor: ef.valor });
   const selo = fisica.tipo === 'ctrl' ? '<span class="selo-ctrl">Ctrl+C</span>' : '';
   if (!nova) return `<div class="topo-pilha" role="img" aria-label="${alt}"><img src="${final}" alt="">${selo}</div>`;
   if (fisica.tipo !== 'ctrl') {
     return `<div class="topo-pilha entrou" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""><img class="pinta" src="${final}" alt=""></div>`;
   }
-  return `<div class="topo-pilha entrou" role="img" aria-label="${alt}"><img class="some-depois" src="cartas/ctrl.webp" alt=""><img class="pinta some-depois" src="cartas/ctrl-${cor}.webp" alt=""><img class="final-vira" src="${final}" alt="">${selo.replace('selo-ctrl', 'selo-ctrl atrasado')}</div>`;
+  return `<div class="topo-pilha entrou" role="img" aria-label="${alt}"><img class="some-depois" src="${PASTA}/ctrl.webp" alt=""><img class="pinta some-depois" src="${PASTA}/ctrl-${cor}.webp" alt=""><img class="final-vira" src="${final}" alt="">${selo.replace('selo-ctrl', 'selo-ctrl atrasado')}</div>`;
 }
 // Todas as cartas baixadas e prontas antes de precisar delas: a carta que outro jogador joga
 // aparece na hora na pilha e nas animações (antes ela só era baixada na primeira vez que aparecia)
@@ -372,9 +393,10 @@ function todasAsCartas() {
     for (const t of ['pular', 'reverso', 'mais2']) l.push(`${c}-${t}`);
     for (const b of ['coringa', 'mais5', 'ctrl']) l.push(`${b}-${c}`);
   }
-  return l.map((n) => `cartas/${n}.webp`);
+  return l.map((n) => `${PASTA}/${n}.webp`);
 }
-(function preCarregar() {
+function preCarregarDeck() {
+  CARTAS_PRONTAS.length = 0;
   for (const src of todasAsCartas()) {
     const i = new Image();
     i.decoding = 'async';
@@ -382,7 +404,8 @@ function todasAsCartas() {
     if (i.decode) i.decode().catch(() => {});
     CARTAS_PRONTAS.push(i); // guardadas na memória: o navegador não joga fora
   }
-})();
+}
+preCarregarDeck();
 // Cartas e sons ficam guardados no celular (abre mais rápido e gasta menos internet)
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && location.hostname !== 'claude.ai' && !location.hostname.endsWith('.claudeusercontent.com')) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
@@ -448,9 +471,9 @@ function telaInicio() {
   <main class="tela" style="justify-content:space-between;position:relative">
     <div style="position:absolute;top:12px;right:0;z-index:2;display:flex;gap:6px">${botoesZoom()}${botaoSom()}${botaoTelaCheia()}</div>
     <div style="position:relative;height:220px;flex:none" aria-hidden="true">
-      <img src="cartas/roxo-0.webp" alt="" style="position:absolute;left:calc(50% - 128px);top:22px;width:100px;transform:rotate(-16deg);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
-      <img src="cartas/ctrl.webp" alt="" style="position:absolute;left:calc(50% - 50px);top:0;width:100px;border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
-      <img src="cartas/mais5.webp" alt="" style="position:absolute;left:calc(50% + 28px);top:22px;width:100px;transform:rotate(16deg);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
+      <img src="${PASTA}/roxo-0.webp" alt="" style="position:absolute;left:calc(50% - 128px);top:22px;width:100px;transform:rotate(-16deg);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
+      <img src="${PASTA}/ctrl.webp" alt="" style="position:absolute;left:calc(50% - 50px);top:0;width:100px;border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
+      <img src="${PASTA}/mais5.webp" alt="" style="position:absolute;left:calc(50% + 28px);top:22px;width:100px;transform:rotate(16deg);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
     </div>
     <div style="text-align:center;display:flex;flex-direction:column;gap:4px">
       <h1 style="font-size:46px;line-height:1;color:var(--destaque)">Uno Resenhas</h1>
@@ -468,6 +491,8 @@ function telaInicio() {
       </div>
       <label for="apelido" style="font-weight:700;color:var(--suave)">Seu apelido</label>
       <input id="apelido" class="campo" maxlength="14" autocomplete="nickname" value="${esc(S.apelido)}" placeholder="Como te chamam na mesa">
+      <span style="font-weight:700;color:var(--suave)">Deck das cartas</span>
+      ${htmlEscolhaDeck()}
       <button class="btn btn-principal" style="min-height:56px;margin-top:8px" type="button" id="criar-online" ${S.temServidor === false ? 'disabled' : ''}>Criar sala online</button>
       ${S.temServidor ? `<div class="salas-abertas" id="salas-abertas">${htmlSalasAbertas()}</div>` : ''}
       <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px">
@@ -482,6 +507,7 @@ function telaInicio() {
   S.erroInicio = null;
   ligarBotaoSom();
   ligarSalasAbertas();
+  ligarEscolhaDeck(app);
   buscarSalas();
   const entrada = document.getElementById('arquivo-foto');
   document.getElementById('foto').onclick = () => entrada.click();
@@ -1131,8 +1157,8 @@ function itensDaJogada(jogada) {
   const cor = S.e.corAtual;
   return jogada.fisicas.map((c, i) => {
     const ef = jogada.efetivas[i];
-    if (c.tipo === 'coringa' || c.tipo === '+5') return { src: `cartas/${baseCoringa(c.tipo)}-${cor}.webp` };
-    if (c.tipo === 'ctrl') return { src: `cartas/ctrl-${ehPreta(ef.tipo) ? cor : ef.cor}.webp`, rotulo: `= ${nomeCarta(ef)}` };
+    if (c.tipo === 'coringa' || c.tipo === '+5') return { src: `${PASTA}/${baseCoringa(c.tipo)}-${cor}.webp` };
+    if (c.tipo === 'ctrl') return { src: `${PASTA}/ctrl-${ehPreta(ef.tipo) ? cor : ef.cor}.webp`, rotulo: `= ${nomeCarta(ef)}` };
     return { src: imgCarta(c) };
   });
 }
@@ -1754,7 +1780,7 @@ async function desenharArte() {
   });
   const [fotos, enfeites] = await Promise.all([
     Promise.all(lista.map((p) => (p.foto ? carregarImg(p.foto) : null))),
-    Promise.all(['cartas/vermelho-7.webp', 'cartas/azul-reverso.webp', 'cartas/verde-mais2.webp', 'cartas/roxo-0.webp', 'cartas/amarelo-pular.webp', 'cartas/mais5-roxo.webp'].map(carregarImg)),
+    Promise.all([`${PASTA}/vermelho-7.webp`, `${PASTA}/azul-reverso.webp`, `${PASTA}/verde-mais2.webp`, `${PASTA}/roxo-0.webp`, `${PASTA}/amarelo-pular.webp`, `${PASTA}/mais5-roxo.webp`].map(carregarImg)),
   ]);
   // fundo azul-noite com brilho dourado no alto
   const g = c.createLinearGradient(0, 0, 0, H);
@@ -2385,6 +2411,12 @@ document.addEventListener('fullscreenchange', () => {
   if (b) { b.querySelector('svg').innerHTML = iconeTelaCheia(); b.setAttribute('aria-label', document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia'); }
 });
 aplicarZoom();
-// Verso das cartas: usa a arte "fundo das cartas" quando ela estiver na pasta cartas/
-(function () { const i = new Image(); i.onload = () => document.body.classList.add('tem-verso'); i.src = 'cartas/verso.webp'; })();
+// Verso das cartas: usa a arte do verso do deck escolhido
+function carregarVerso() {
+  const i = new Image();
+  i.onload = () => { document.body.style.setProperty('--verso-url', `url(${PASTA}/verso.webp)`); document.body.classList.add('tem-verso'); };
+  i.onerror = () => document.body.classList.remove('tem-verso');
+  i.src = `${PASTA}/verso.webp`;
+}
+carregarVerso();
 render();

@@ -11,6 +11,7 @@ const pagina = readFileSync('web/pagina.html', 'utf8')
 mkdirSync('dist', { recursive: true });
 writeFileSync('dist/index.html', pagina);
 cpSync('web/cartas', 'dist/cartas', { recursive: true });
+cpSync('web/cartas-min', 'dist/cartas-min', { recursive: true });
 cpSync('web/sons', 'dist/sons', { recursive: true });
 cpSync('web/publico', 'dist', { recursive: true });
 console.log('dist/index.html', pagina.length, 'bytes');

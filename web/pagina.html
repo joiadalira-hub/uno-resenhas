@@ -75,7 +75,17 @@ h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance; }
 .monte:disabled { cursor: default; }
 /* verso das cartas: a arte "fundo das cartas" quando existir; senão, um verso escuro com UR */
 .verso { background: #0B0F1E center / cover no-repeat; border: 2px solid #fff; }
-body.tem-verso .verso { background-image: url(cartas/verso.webp); }
+body.tem-verso .verso { background-image: var(--verso-url); }
+/* escolha do deck */
+.decks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.deck-op { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 8px; border-radius: 14px; border: 2px solid var(--borda); background: var(--chao); color: var(--texto); cursor: pointer; }
+.deck-op[aria-pressed="true"] { border-color: var(--destaque); background: #2A2A12; }
+.deck-op b { font-size: 14px; }
+.deck-mini { position: relative; width: 96px; height: 62px; }
+.deck-mini img { position: absolute; top: 2px; width: 38px; border-radius: 5px; box-shadow: 0 3px 8px rgba(0,0,0,.45); }
+.deck-mini img:nth-child(1) { left: 4px; transform: rotate(-12deg); }
+.deck-mini img:nth-child(2) { left: 29px; top: 0; z-index: 1; }
+.deck-mini img:nth-child(3) { left: 54px; transform: rotate(12deg); }
 body.tem-verso .monte b { display: none; }
 /* mesa oval: os adversários sentam em volta, conforme o número de jogadores */
 .arena { position: relative; flex: 1; min-height: 170px; }

@@ -21,19 +21,35 @@ const ESPERA_SALA = 3 * 60 * 1000;      // na sala de espera, quem caiu (ex.: fo
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // ---------------- site ----------------
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.mp3': 'audio/mpeg', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 const CABECALHO = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
   + '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><base href="/">'
   + '<meta name="theme-color" content="#10162B"><link rel="manifest" href="/manifest.webmanifest">'
-  + '<link rel="icon" href="/icone-192.png"><link rel="apple-touch-icon" href="/icone-192.png">'
+  + '<link rel="icon" href="/icone-192.png"><link rel="apple-touch-icon" href="/icone-180.png">'
   + '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
   + '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Uno Resenhas">'
   + '<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>';
+// Prévia do link (WhatsApp, Telegram, Instagram…): título, texto e a imagem og.jpg.
+// No link de uma sala, o título diz o nome da sala.
+const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function previa(req, caminho) {
+  const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0];
+  const base = `${proto}://${req.headers.host}`;
+  const sala = caminho.startsWith('/s/') ? salas.get(caminho.slice(3, 8).toUpperCase()) : null;
+  const titulo = sala ? `Entra na mesa "${sala.nome}" · Uno Resenhas` : 'Uno Resenhas';
+  const texto = sala ? `Bora jogar! Sala ${sala.codigo}${sala.config.salaAberta ? ' · sala aberta' : ''}. 5 cores, +5, Ctrl+C e muita resenha.` : '5 cores, +5, Ctrl+C e muita resenha. Jogue online com os amigos, direto no navegador.';
+  const t = escHtml(titulo), d = escHtml(texto);
+  return `<meta name="description" content="${d}"><meta property="og:type" content="website"><meta property="og:site_name" content="Uno Resenhas">`
+    + `<meta property="og:title" content="${t}"><meta property="og:description" content="${d}"><meta property="og:url" content="${escHtml(base + caminho)}">`
+    + `<meta property="og:image" content="${base}/og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`
+    + `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${t}"><meta name="twitter:description" content="${d}"><meta name="twitter:image" content="${base}/og.jpg">`;
+}
 const servidor = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   let caminho = decodeURIComponent(url.pathname);
   if (caminho === '/saude') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
   if (caminho === '/salas') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify(salasParaEntrar())); }
+  const pedido = caminho;
   if (caminho === '/' || caminho.startsWith('/s/')) caminho = '/index.html';
   const arquivo = path.join(RAIZ, path.normalize(caminho));
   if (!arquivo.startsWith(RAIZ)) { res.writeHead(403); return res.end(); }
@@ -42,7 +58,7 @@ const servidor = http.createServer((req, res) => {
     const ext = path.extname(arquivo).toLowerCase();
     // a página do jogo ganha o cabeçalho de site: tela de celular, ícone de app e base "/"
     // (a base faz as cartas carregarem também nos links de sala, /s/CODIGO)
-    if (arquivo.endsWith('index.html')) dados = Buffer.concat([Buffer.from(CABECALHO), dados]);
+    if (arquivo.endsWith('index.html')) dados = Buffer.concat([Buffer.from(CABECALHO + previa(req, pedido)), dados]);
     // tudo é conferido com o servidor (no-cache + ETag): arte nova de carta aparece na hora,
     // e o que não mudou volta como "304" (sem baixar de novo)
     const etag = '"' + createHash('md5').update(dados).digest('hex').slice(0, 16) + '"';

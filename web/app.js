@@ -626,7 +626,7 @@ function renderModal() {
       <button class="btn btn-principal" id="ok-zero" ${m.alvo ? '' : 'disabled'}>Confirmar</button>`;
   }
   if (m.tipo === 'espiada') corpo = `<h2 style="font-size:24px">Mão de ${esc(nomeJog(m.alvo).replace('Bot ', ''))}</h2><div class="espiadas">${m.mao.map((c) => `<img src="${imgCarta(c)}" alt="${esc(nomeCarta(c))}">`).join('')}</div><button class="btn btn-principal" id="fechar">Fechar</button>`;
-  if (m.tipo === 'sair') corpo = `<h2 style="font-size:24px">Sair da partida?</h2><p style="margin:0;color:var(--suave)">O placar desta partida será perdido.</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><button class="btn" id="fechar">Continuar jogando</button><button class="btn btn-perigo" id="confirmar-sair">Sair</button></div>`;
+  if (m.tipo === 'sair') corpo = `<h2 style="font-size:24px">Sair da partida?</h2><p style="margin:0;color:var(--suave)">${S.online ? 'Um bot joga no seu lugar até o fim da mão e depois você sai da mesa.' : 'O placar desta partida será perdido.'}</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><button class="btn" id="fechar">Continuar jogando</button><button class="btn btn-perigo" id="confirmar-sair">Sair</button></div>`;
   return `<div class="fundo-modal"><div class="modal" role="dialog" aria-modal="true">${corpo}</div></div>`;
 }
 function ligarModal() {

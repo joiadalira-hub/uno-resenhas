@@ -15,7 +15,7 @@ import { escolherAcao } from '../motor/bot.js';
 const PORTA = Number(process.env.PORT) || 3000;
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
 const NOMES_BOTS = ['Ana', 'Rui', 'Bia', 'Léo', 'Duda', 'Caio', 'Mel', 'Nina', 'Tito'];
-const ESPERA_RECONEXAO = 45000; // depois disso, um bot assume a mão de quem caiu
+const ESPERA_RECONEXAO = 5000;  // caiu a conexão: em 5 s um bot joga por ele até a mão acabar (se voltar, retoma)
 const ESPERA_VOTOS = 90000;
 const ESPERA_SALA = 3 * 60 * 1000;      // na sala de espera, quem caiu (ex.: foi mandar o link no WhatsApp) guarda o lugar por 3 min      // quem não votar até lá continua na mesa
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -153,14 +153,14 @@ class Sala {
     for (const j of this.e.jogadores) {
       const a = this.assento(j.id);
       if (a && (a.saiu || a.sai)) this.votos[j.id] = false; // saiu no meio da mão, ou bot que cede o lugar
-      else if (j.bot) this.votos[j.id] = true;
+      else if (a && a.tipo === 'bot') this.votos[j.id] = true; // humano com bot no lugar ainda vota (ou sai, se não voltar)
     }
     clearTimeout(this.timerVotos);
     this.timerVotos = setTimeout(() => {
       if (!this.votos) return;
       for (const j of this.e.jogadores) if (!(j.id in this.votos)) {
         const a = this.assento(j.id);
-        this.votos[j.id] = !(this.config.salaAberta && a && a.tipo === 'humano' && !a.conectado); // na sala aberta, quem sumiu sai
+        this.votos[j.id] = !(a && a.tipo === 'humano' && !a.conectado); // quem caiu e não voltou até o fim da votação sai da mesa
       }
       this.conferirVotos();
     }, ESPERA_VOTOS);
@@ -425,22 +425,19 @@ function tratar(conexao, msg, ctx) {
       const bot = sala.assentos.find((a) => a.tipo === 'bot' && a.sai);
       if (bot) bot.sai = false;
       sala.enviarSala();
-    } else if (i >= 0 && sala.config.salaAberta && sala.e && sala.e.fase === 'jogando') {
-      // sala aberta: um bot termina a mão por ele e ele sai da mesa quando ela acabar
+    } else if (i >= 0 && sala.e) {
+      // saiu da partida: um bot termina a mão por ele e ele sai da mesa quando ela acabar
       assento.token = null; assento.saiu = true; assento.conectado = false; assento.conexao = null;
       const j = sala.e.jogadores.find((x) => x.id === assento.id);
       if (j) j.bot = true;
-      // abriu um lugar: o bot que ia ceder o lugar para quem chegou pode ficar
+      // abriu um lugar: o bot que ia ceder o lugar para quem chegou (sala aberta) pode ficar
       const botSaindo = sala.assentos.find((a) => a.tipo === 'bot' && a.sai);
       if (botSaindo && sala.assentos.filter((a) => !a.saiu && !a.sai).length < sala.capacidade) botSaindo.sai = false;
       sala.passarDono();
-      sala.agendar({ tipo: 'nada' });
+      log('saiu da partida (bot até o fim da mão)', sala.codigo, assento.nome);
+      if (sala.votos) sala.votar(assento.id, false); // saiu entre as mãos = Não
+      else if (sala.e.fase === 'jogando') { sala.agendar({ tipo: 'nada' }); sala.enviarEstado(null); }
       sala.enviarSala();
-      sala.enviarEstado(null);
-    } else if (i >= 0) {
-      assento.token = null;
-      if (sala.votos && sala.e.jogadores.some((j) => j.id === assento.id)) sala.votar(assento.id, false); // saiu entre as rodadas = Não
-      sala.caiu(assento);
     }
     ctx.sala = null; ctx.assento = null;
   }

@@ -26,7 +26,7 @@ const app = document.getElementById('app');
 
 // ---------- sons ----------
 // sons/ : jogar, carta, combo e reverso vieram prontos; os outros foram criados para o jogo
-const NOMES_SONS = ['jogar', 'carta', 'combo', 'reverso', 'pular', 'ataque', 'coringa', 'ctrl', 'trocar', 'espiar', 'nove', 'apertou', 'ultima', 'pegou', 'sua-vez', 'tique', 'erro', 'vitoria', 'vitoria-partida', 'derrota'];
+const NOMES_SONS = ['corte', 'jogar', 'carta', 'combo', 'reverso', 'pular', 'ataque', 'coringa', 'ctrl', 'trocar', 'espiar', 'nove', 'apertou', 'ultima', 'pegou', 'sua-vez', 'tique', 'erro', 'vitoria', 'vitoria-partida', 'derrota'];
 const VOLUME = { carta: 0.6, tique: 0.8, 'sua-vez': 0.9, apertou: 0.9 };
 const bancoSom = {};
 let somCartaEm = 0;
@@ -1020,7 +1020,7 @@ function agir(acao) {
 // Como a mesa estava antes da jogada (para animar as diferenças)
 function fotoAntes() {
   const topo = { cartaDoTopo: S.e.descarte[S.e.descarte.length - 1], topo: S.e.topo, corAtual: S.e.corAtual };
-  return { topo, sentido: S.e.sentido, pendente: !!S.e.compraPendente, maos: Object.fromEntries(S.e.jogadores.map((j) => [j.id, j.mao.length])), minhas: new Set(minhaMao().map((c) => c.id)) };
+  return { topo, vez: S.e.jogadores[S.e.vez] && S.e.jogadores[S.e.vez].id, sentido: S.e.sentido, pendente: !!S.e.compraPendente, maos: Object.fromEntries(S.e.jogadores.map((j) => [j.id, j.mao.length])), minhas: new Set(minhaMao().map((c) => c.id)) };
 }
 
 // Efeitos de uma jogada já aplicada (local ou vinda do servidor): aviso, sons, animações, compras
@@ -1038,7 +1038,19 @@ function posAcao(acao, r, jogada, antes) {
     const pulados = Array.from({ length: q }, (_, k) => S.e.jogadores[(((jogada.indice + S.e.sentido * (k + 1)) % N) + N) % N].id);
     efeito = { tipo: 'pulo', pulados, destino: S.e.jogadores[S.e.vez].id };
   }
-  if (jogada && (combo || efeito)) {
+  if (acao.tipo === 'corte' && jogada) {
+    // CORTOU!: a carta igual cai em cima da do topo, a lâmina passa e a vez é "roubada"
+    const N = S.e.jogadores.length, ia = S.e.jogadores.findIndex((j) => j.id === antes.vez), ic = jogada.indice, sent = antes.sentido;
+    const perderam = [];
+    if (ia >= 0 && ia !== ic) for (let k = ia, n = 0; k !== ic && n < N; k = (((k + sent) % N) + N) % N, n++) perderam.push(S.e.jogadores[k].id);
+    const destino = S.e.fase === 'jogando' ? S.e.jogadores[S.e.vez].id : null;
+    const marca = (ui.marcaTopo || 0) + 1;
+    ui.marcaTopo = marca;
+    ui.topoSegurado = antes.topo;
+    ui.ultimaCarta = S.e.descarte[S.e.descarte.length - 1].id;
+    const soltar = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; if (S.tela === 'mesa') render(); } };
+    ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itensDaJogada(jogada)[0], perderam, destino, soltar);
+  } else if (jogada && (combo || efeito)) {
     const marca = (ui.marcaTopo || 0) + 1;
     ui.marcaTopo = marca;
     ui.topoSegurado = antes.topo; // a pilha continua mostrando a carta de antes
@@ -1265,6 +1277,63 @@ function efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf) {
   quadros.splice(1, 0, { transform: `translate(${pontos[0].x}px, ${pontos[0].y}px) scale(1)`, opacity: 1 });
   quadros.forEach((f, i) => { f.offset = i / (quadros.length - 1); });
   bola.animate(quadros, { duration: (pulados.length + 1) * SALTO + 250, easing: 'ease-in-out', fill: 'forwards' });
+}
+
+// ---------- CORTOU!: carta idêntica fora da vez ----------
+const SALTO_CORTE = 420;
+function duracaoCorte(temVez) { const fimBola = temVez ? 900 + 2 * SALTO_CORTE + 200 : 1300; return fimBola + 260 + 350; }
+function mostrarCorte(idJog, item, perderam, destino, aoPousar) {
+  if (comboAtivo) comboAtivo.remove();
+  const p = criarPalco('combo-show corte-show', `${nomeJog(idJog)} cortou a jogada`);
+  if (!p) { aoPousar(); return 0; }
+  const { palco, area, r } = p;
+  // duas cartas iguais: a do topo (já na mesa) e a que corta, caindo em cima
+  montarEfeito(area, r, idJog, 'CORTOU!', perderam.length ? (perderam.length === 1 ? `${nomeJog(perderam[0]).replace('Bot ', '')} perdeu a vez` : `${perderam.length} perderam a vez`) : '', [item, item]);
+  const cartas = area.querySelectorAll('.combo-carta');
+  cartas[0].style.animation = 'none';
+  cartas[0].style.setProperty('--x', '-6px'); cartas[0].style.setProperty('--y', '4px'); cartas[0].style.setProperty('--r', '-4deg');
+  cartas[1].style.animationDelay = '350ms';
+  cartas[1].style.setProperty('--x', '14px'); cartas[1].style.setProperty('--y', '-8px'); cartas[1].style.setProperty('--r', '7deg');
+  area.querySelector('.efeito-cartas').insertAdjacentHTML('beforeend', '<div class="corte-lamina" aria-hidden="true"><span class="corte-tesoura">✂</span></div>');
+  comboAtivo = palco;
+  tocar('jogar');
+  const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const temVez = !!destino && !reduzido;
+  const total = duracaoCorte(temVez);
+  setTimeout(() => { if (!palco.isConnected) return; palco.classList.add('cortando'); tocar('corte'); }, 650);
+  setTimeout(() => palco.classList.add('espalha'), 600);
+  if (temVez) setTimeout(() => { if (palco.isConnected) bolaDaVez(palco, [perderam[0] || idJog, idJog, destino], perderam); }, 900);
+  const tRecolhe = total - 350 - 260;
+  setTimeout(() => { if (palco.isConnected) recolherNaPilha(palco, 0, 260); }, tRecolhe);
+  setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, tRecolhe + 260);
+  setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, total);
+  return total;
+}
+// a bolinha "VEZ" saindo de quem ia jogar, passando por quem cortou e indo ao próximo
+function bolaDaVez(palco, ids, perderam) {
+  const pontos = ids.map(centroDoJogador);
+  if (pontos.some((x) => !x)) return;
+  perderam.forEach((id, k) => {
+    const c = centroDoJogador(id); if (!c) return;
+    const selo = document.createElement('div');
+    selo.className = 'pulo-bloqueio';
+    selo.style.left = c.x + 'px'; selo.style.top = c.y + 'px';
+    selo.style.animationDelay = (SALTO_CORTE * 0.5 + k * 80) + 'ms';
+    palco.appendChild(selo);
+  });
+  const bola = document.createElement('div');
+  bola.className = 'pulo-bola';
+  bola.textContent = 'VEZ';
+  palco.appendChild(bola);
+  const q = [{ transform: `translate(${pontos[0].x}px, ${pontos[0].y}px) scale(.4)`, opacity: 0 }, { transform: `translate(${pontos[0].x}px, ${pontos[0].y}px) scale(1)`, opacity: 1 }];
+  for (let k = 1; k < pontos.length; k++) {
+    const a = pontos[k - 1], b = pontos[k];
+    const alto = Math.max(70, Math.hypot(b.x - a.x, b.y - a.y) * 0.45);
+    q.push({ transform: `translate(${(a.x + b.x) / 2}px, ${(a.y + b.y) / 2 - alto}px) scale(1.15)`, opacity: 1 });
+    q.push({ transform: `translate(${b.x}px, ${b.y}px) scale(${k === pontos.length - 1 ? 1.35 : 0.9})`, opacity: 1 });
+  }
+  q.forEach((f, i) => { f.offset = i / (q.length - 1); });
+  bola.animate(q, { duration: 2 * SALTO_CORTE + 200, easing: 'ease-in-out', fill: 'forwards' });
 }
 
 // ---------- compra por efeito (+2, +5, desafio, "Pegou!"): +N com a foto de quem compra ----------

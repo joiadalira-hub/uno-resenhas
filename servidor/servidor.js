@@ -283,6 +283,7 @@ class Sala {
       const durB = !efeito ? 700 : efeito === 'reverso' ? 1500 : (n + 1) * 520 + 350;
       t = tB + durB + (n - 1) * 110 + 260 + 350;
     }
+    if (evento.acao && evento.acao.tipo === 'corte' && jogada) t = (this.e.fase === 'jogando' ? 900 + 2 * 420 + 200 : 1300) + 260 + 350; // CORTOU!
     if (jogada && this.e.fase === 'jogando') {
       const fis = jogada.fisicas[jogada.fisicas.length - 1];
       if (jogada.fisicas.length === 1 && (fis.tipo === 'coringa' || fis.tipo === '+5' || fis.tipo === 'ctrl')) t = Math.max(t, 1100);

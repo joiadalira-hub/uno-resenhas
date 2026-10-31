@@ -82,3 +82,15 @@ salva('vitoria-partida', junta(*[(o, tom(nota(n), d, 'saw', a=0.01, r=0.12 if d 
 # Alguém outro venceu: "ôôô" descendo
 salva('derrota', junta(*[(i * 0.28, tom(nota(n), 0.3 if i < 2 else 0.9, 'tri', a=0.02, r=0.15 if i < 2 else 0.6, vib=0 if i < 2 else 5)) for i, n in enumerate((67, 63, 60))]), pico=-8)
 print('ok')
+
+# corte: "swoosh" de lâmina (ruído que varre do grave ao agudo) + um "tchim" metálico curto
+def varre(d, f0, f1):
+    x = t(d); y = np.random.default_rng(11).standard_normal(len(x))
+    out = np.zeros_like(y); a = 0.0
+    for i in range(len(y)):  # passa-baixa com corte que sobe ao longo do som
+        k = (f0 + (f1 - f0) * i / len(y)) / R
+        a += min(1, 2 * np.pi * k) * (y[i] - a); out[i] = a
+    return out * env(len(x), 0.04, 0.12)
+salva('corte', junta((0, varre(0.26, 300, 7000) * 1.4),
+                     (0.17, tom(2350, 0.32, 'sin', a=0.002, r=0.28) * 0.55),
+                     (0.17, tom(3550, 0.22, 'sin', a=0.002, r=0.2) * 0.35)), pico=-6)

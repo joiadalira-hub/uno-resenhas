@@ -206,6 +206,16 @@ body.tem-verso .monte b { display: none; }
 .palco.recolhe .palco-fundo, .palco.recolhe .anim-cab { opacity: 0; transition: opacity .3s; }
 .palco.recolhe .combo-carta { transition: none; }
 .palco.recolhe .reverso-setas { opacity: 0; transition: opacity .3s; }
+/* CORTOU! */
+.corte-show .anim-titulo { color: #FFB199; -webkit-text-stroke: 3px #3A0805; text-shadow: 0 7px 0 #E8452C, 0 14px 30px rgba(0,0,0,.75); }
+.corte-lamina { position: absolute; z-index: 20; left: 50%; top: 50%; width: calc(var(--cw) * 2.6); height: 10px; margin: -5px 0 0 calc(var(--cw) * -1.3); rotate: -38deg; border-radius: 5px;
+  background: linear-gradient(90deg, transparent, #fff 20%, #fff 80%, transparent); box-shadow: 0 0 18px #fff, 0 0 40px #FF8A6B; transform: scaleX(0); transform-origin: 0 50%; opacity: 0; }
+.corte-tesoura { position: absolute; right: -6px; top: 50%; translate: 50% -50%; rotate: 38deg; font-size: calc(var(--cw) * .42); color: #fff; text-shadow: 0 0 12px #FF8A6B; }
+.palco.cortando .corte-lamina { animation: lamina .42s cubic-bezier(.6,0,.3,1) forwards; }
+@keyframes lamina { 0% { transform: scaleX(0); opacity: 1; } 55% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+.palco.cortando .combo-carta { animation: treme-corte .35s .12s ease-out; }
+@keyframes treme-corte { 25% { translate: -6px 3px; } 50% { translate: 5px -3px; } 75% { translate: -3px 2px; } }
+.palco.recolhe .corte-lamina { display: none; }
 /* +N de compra por efeito */
 .compra-show .anim-titulo { color: #fff; -webkit-text-stroke: 3px #3A0805; text-shadow: 0 7px 0 var(--perigo), 0 14px 30px rgba(0,0,0,.75); font-size: clamp(64px, 14vw, 130px); }
 /* cabeçalho: foto/avatar, nome e título */

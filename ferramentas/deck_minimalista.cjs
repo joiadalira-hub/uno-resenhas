@@ -29,12 +29,13 @@ function fundo(c) {
     <rect width="${W}" height="${H}" fill="url(#g)"/>`;
 }
 // texto do canto: em cima à esquerda e, girado, embaixo à direita
-function cantos(txt, tam = 84, sub = false) {
-  const t = (x, y, rot) => `<g transform="translate(${x} ${y}) rotate(${rot})"><text x="0" y="0" font-size="${tam}" font-weight="300" fill="#fff" style="${FONTE}">${txt}</text>${sub ? `<line x1="2" y1="16" x2="${tam * 0.55}" y2="16" stroke="#fff" stroke-width="5"/>` : ''}</g>`;
-  return t(58, 58 + tam * 0.72, 0) + t(W - 58, H - 58 - tam * 0.72, 180);
+// cantos maiores e mais grossos que nos exemplos, para ler bem com as cartas pequenas na mão
+function cantos(txt, tam = 112, sub = false) {
+  const t = (x, y, rot) => `<g transform="translate(${x} ${y}) rotate(${rot})"><text x="0" y="0" font-size="${tam}" font-weight="500" fill="#fff" style="${FONTE}">${txt}</text>${sub ? `<line x1="4" y1="20" x2="${tam * 0.56}" y2="20" stroke="#fff" stroke-width="9"/>` : ''}</g>`;
+  return t(50, 50 + tam * 0.72, 0) + t(W - 50, H - 50 - tam * 0.72, 180);
 }
-function cantosIcone(icone, escala = 0.38) {
-  return `<g transform="translate(108 112) scale(${escala})">${icone}</g><g transform="translate(${W - 108} ${H - 112}) rotate(180) scale(${escala})">${icone}</g>`;
+function cantosIcone(icone, escala = 0.5) {
+  return `<g transform="translate(118 122) scale(${escala})">${icone}</g><g transform="translate(${W - 118} ${H - 122}) rotate(180) scale(${escala})">${icone}</g>`;
 }
 const svg = (corpo) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${corpo}</svg>`;
 
@@ -86,7 +87,7 @@ function carta(nome) {
   }
   if ((m = nome.match(/^(\w+)-(pular|mais2|reverso)$/))) {
     const [, cor, t] = m;
-    const canto = t === 'mais2' ? cantos('+2') : cantosIcone(ICONE[t](t === 'pular' ? 16 : 14));
+    const canto = t === 'mais2' ? cantos('+2') : cantosIcone(ICONE[t](t === 'pular' ? 22 : 20));
     return svg(fundo(COR[cor]) + canto + centro(`<g transform="scale(${t === 'mais2' ? 1.25 : t === 'reverso' ? 1.15 : 1.05})">${ICONE[t](t === 'reverso' ? 12 : undefined)}</g>`));
   }
   if ((m = nome.match(/^(coringa|mais5|ctrl)(?:-(\w+))?$/))) {
@@ -95,13 +96,13 @@ function carta(nome) {
     const branco = (n) => Array(n).fill('#fff');
     if (t === 'coringa') {
       const cores = cor ? branco(5) : CORES5;
-      return svg(fundo(bg) + cantosIcone(ICONE.anel(cores, 24, 92), 0.42) + centro(ICONE.anel(cores, 20, 92)));
+      return svg(fundo(bg) + cantosIcone(ICONE.anel(cores, 30, 92), 0.5) + centro(ICONE.anel(cores, 20, 92)));
     }
     if (t === 'mais5') {
       const cores = cor ? branco(5) : ESCADA5;
       return svg(fundo(bg) + cantos('+5') + centro(`<g transform="scale(1.25)">${ICONE.mais5(cores)}</g>`));
     }
-    return svg(fundo(bg) + cantos('Ctrl+C', 60) + centro(`<g transform="scale(1.15)">${ICONE.ctrl(cor ? null : CORES5)}</g>`));
+    return svg(fundo(bg) + cantos('Ctrl+C', 74) + centro(`<g transform="scale(1.15)">${ICONE.ctrl(cor ? null : CORES5)}</g>`));
   }
   if (nome === 'verso') {
     return svg(fundo(ESCURO) + centro(ICONE.anel(CORES5, 12, 190)

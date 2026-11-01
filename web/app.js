@@ -755,8 +755,8 @@ function htmlAvatar(j) {
 function telaMesa() {
   telaDesenhada = null;
   const e = S.e, ui = S.ui, v = visaoDe(e, EU);
-  const vez = minhaVez() && !ui.distribuindo; // enquanto as cartas são distribuídas ninguém joga
-  const mao = minhaMao().filter((c) => !(ui.pendentes && ui.pendentes.has(c.id)));
+  const vez = minhaVez() && !ui.distribuindo && !ui.maoSegurada; // enquanto as cartas são distribuídas (ou as mãos trocam) ninguém joga
+  const mao = ui.maoSegurada || minhaMao().filter((c) => !(ui.pendentes && ui.pendentes.has(c.id)));
   const fim = e.opcoes.fim;
   const rotRodada = fim.modo === 'rodadas' ? `Rodada ${e.rodada} de ${fim.valor}` : fim.modo === 'pontos' ? `Rodada ${e.rodada} · até ${fim.valor} pts` : e.opcoes.salaAberta ? `Mão ${e.rodada} · sala aberta` : fim.modo === 'vitorias' ? `Rodada ${e.rodada} · vitórias` : `Rodada ${e.rodada}`;
   const rivais = v.jogadores.filter((j) => j.id !== EU);
@@ -1038,7 +1038,7 @@ function agir(acao) {
 // Como a mesa estava antes da jogada (para animar as diferenças)
 function fotoAntes() {
   const topo = { cartaDoTopo: S.e.descarte[S.e.descarte.length - 1], topo: S.e.topo, corAtual: S.e.corAtual };
-  return { topo, vez: S.e.jogadores[S.e.vez] && S.e.jogadores[S.e.vez].id, sentido: S.e.sentido, pendente: !!S.e.compraPendente, maos: Object.fromEntries(S.e.jogadores.map((j) => [j.id, j.mao.length])), minhas: new Set(minhaMao().map((c) => c.id)) };
+  return { topo, vez: S.e.jogadores[S.e.vez] && S.e.jogadores[S.e.vez].id, sentido: S.e.sentido, pendente: !!S.e.compraPendente, maos: Object.fromEntries(S.e.jogadores.map((j) => [j.id, j.mao.length])), minhas: new Set(minhaMao().map((c) => c.id)), minhasCartas: minhaMao().map((c) => ({ ...c })) };
 }
 
 // Efeitos de uma jogada já aplicada (local ou vinda do servidor): aviso, sons, animações, compras
@@ -1083,6 +1083,21 @@ function posAcao(acao, r, jogada, antes) {
     const de = acao.jogador, com = troca.com;
     setTimeout(() => { if (S.e) mostrarTroca(de, com); }, atraso);
     ui.comboAte = Date.now() + atraso + DURACAO_TROCA;
+    // As mãos novas só aparecem quando os leques terminam de cruzar a mesa
+    const jogadas = new Set(jogada ? jogada.fisicas.map((c) => c.id) : []);
+    const qtdDe = Math.max(0, (maosAntes[de] || 0) - jogadas.size), qtdCom = maosAntes[com] || 0;
+    ui.mostrado = ui.mostrado || {};
+    if (de !== EU) ui.mostrado[de] = qtdDe;
+    if (com !== EU) ui.mostrado[com] = qtdCom;
+    const marcaTroca = (ui.marcaTroca || 0) + 1;
+    ui.marcaTroca = marcaTroca;
+    if ((de === EU || com === EU) && antes.minhasCartas) ui.maoSegurada = antes.minhasCartas.filter((c) => !jogadas.has(c.id));
+    setTimeout(() => {
+      if (S.ui !== ui || ui.marcaTroca !== marcaTroca) return;
+      ui.maoSegurada = null;
+      if (ui.mostrado) { delete ui.mostrado[de]; delete ui.mostrado[com]; }
+      if (S.tela === 'mesa') render();
+    }, atraso + DURACAO_TROCA - 250);
   }
   // Ficou com 1 carta avisando (antes de jogar, ou apertando "Última!" logo depois, antes de alguém pegar): ÚLTIMA!
   // Quem esquece não ganha animação nenhuma: o ESQUECEU! só aparece se alguém de fato pegar ("Pegou!").

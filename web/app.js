@@ -444,7 +444,7 @@ let timerSalas = null;
 function htmlSalasAbertas() {
   const l = S.salas;
   if (!l) return '<p class="ajuda" style="margin:0;text-align:center">Procurando salas…</p>';
-  if (!l.length) return '<p class="ajuda" style="margin:0;text-align:center">Nenhuma sala aberta agora. Crie a sua!</p>';
+  if (!l.length) return '<p class="info-linha"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.5v.5" stroke-linecap="round"/></svg>Nenhuma sala aberta agora. Crie a sua!</p>';
   const modo = (m) => ({ vitorias: 'vitórias', sem_fim: 'sem fim', rodadas: 'rodadas', pontos: 'pontos' }[m] || m);
   return `<span class="rotulo">Salas para entrar</span>` + l.map((x) => `<button type="button" class="sala-item" data-sala="${esc(x.codigo)}">
       <span class="sala-nome">${x.temSenha ? '🔒 ' : ''}${esc(x.nome)}</span>
@@ -502,37 +502,45 @@ function telaInicio() {
   app.innerHTML = `
   <main class="tela" style="justify-content:space-between;position:relative">
     <div style="position:absolute;top:12px;right:0;z-index:2;display:flex;gap:6px">${botoesZoom()}${botaoSom()}${botaoTelaCheia()}</div>
-    <div style="position:relative;height:220px;flex:none" aria-hidden="true">
-      <img src="${PASTA}/roxo-0.webp" alt="" style="position:absolute;left:calc(50% - 128px);top:22px;width:100px;transform:rotate(-16deg);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
-      <img src="${PASTA}/ctrl.webp" alt="" style="position:absolute;left:calc(50% - 50px);top:0;width:100px;border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
-      <img src="${PASTA}/mais5.webp" alt="" style="position:absolute;left:calc(50% + 28px);top:22px;width:100px;transform:rotate(16deg);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)">
+    <div class="inicio-hero" aria-hidden="true">
+      <span class="anel"></span>
+      <svg class="raios" style="left:calc(50% - 168px);top:34px" width="56" height="60" viewBox="0 0 56 60"><g stroke="#FFD21F" stroke-width="7" stroke-linecap="round"><path d="M10 10l14 18"/><path d="M34 4l4 16"/><path d="M4 40l18 2"/></g></svg>
+      <svg class="raios" style="left:calc(50% + 120px);top:150px" width="56" height="60" viewBox="0 0 56 60"><g stroke="#FFD21F" stroke-width="7" stroke-linecap="round"><path d="M10 34l20-8"/><path d="M14 52l14-14"/><path d="M34 48l4-14"/></g></svg>
+      <img src="${PASTA}/roxo-0.webp" alt="" style="left:calc(50% - 150px);top:48px;transform:rotate(-16deg)">
+      <img src="${PASTA}/ctrl.webp" alt="" style="left:calc(50% - 58px);top:20px;transform:rotate(2deg)">
+      <img src="${PASTA}/mais5.webp" alt="" style="left:calc(50% + 34px);top:52px;transform:rotate(16deg)">
+      <span class="anel frente"></span>
     </div>
-    <div style="text-align:center;display:flex;flex-direction:column;gap:4px">
-      <h1 style="font-size:46px;line-height:1;color:var(--destaque)">Uno Resenhas</h1>
-      <p style="margin:0;color:var(--apagado)">5 cores, +5, Ctrl+C e muita resenha</p>
+    <div class="logo">
+      <span class="coroa" aria-hidden="true"><svg width="38" height="26" viewBox="0 0 38 26"><path d="M3 22L1 6l10 8 8-12 8 12 10-8-2 16z" fill="#FFC61A" stroke="#FF9F11" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+      <h1>Uno <span class="res">Resenhas</span></h1>
+      <svg class="risco" viewBox="0 0 240 14" aria-hidden="true"><path d="M4 10 C 70 0, 170 0, 236 6 C 170 6, 80 8, 4 10z" fill="#FFC61A"/></svg>
+      <p class="slogan">${['', '', '', '', '4 cores, +4, Ctrl+C e muita resenha', '5 cores, +5, Ctrl+C e muita resenha', '6 cores, +6, Ctrl+C e muita resenha'][(S.config && S.config.opcoes && S.config.opcoes.cores) || 5]}</p>
     </div>
     <form id="f-inicio" style="display:flex;flex-direction:column;gap:12px">
       <div class="escolher-foto">
         <button type="button" id="foto" class="avatar-grande" aria-label="${S.avatar ? 'Trocar sua foto' : 'Adicionar sua foto'}">${S.avatar ? `<img src="${S.avatar}" alt="">` : `<span>${esc((S.apelido || '?')[0].toUpperCase())}</span>`}</button>
+        <span class="divisor" aria-hidden="true"></span>
         <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
-          <span style="font-weight:800">Sua foto na mesa</span>
+          <span class="titulo-foto">Sua foto na mesa</span>
           <span class="ajuda" id="foto-status">${S.avatar ? 'Toque na foto para trocar' : 'O fundo sai sozinho e a foto ganha contorno'}</span>
           ${S.avatar ? '<button type="button" class="link" id="tirar-foto">Remover foto</button>' : ''}
         </div>
         <input type="file" id="arquivo-foto" accept="image/*" hidden>
       </div>
-      <label for="apelido" style="font-weight:700;color:var(--suave)">Seu apelido</label>
+      <label for="apelido" class="rotulo-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.5" r="4.5"/><path d="M3 21c0-4.4 4-7.5 9-7.5s9 3.1 9 7.5z"/></svg>Seu apelido</label>
       <input id="apelido" class="campo" maxlength="14" autocomplete="nickname" value="${esc(S.apelido)}" placeholder="Como te chamam na mesa">
-      <span style="font-weight:700;color:var(--suave)">Deck das cartas</span>
+      <span class="rotulo-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5l9 4.5 9-4.5"/></svg>Deck das cartas</span>
       ${htmlEscolhaDeck()}
-      <button class="btn btn-principal" style="min-height:56px;margin-top:8px" type="button" id="criar-online" ${S.temServidor === false ? 'disabled' : ''}>Criar sala online</button>
+      <button class="btn btn-principal btn-grande" style="margin-top:8px" type="button" id="criar-online" ${S.temServidor === false ? 'disabled' : ''}><svg class="ico" width="22" height="26" viewBox="0 0 22 26" aria-hidden="true"><path d="M13 1L2 15h7l-2 10 11-14h-7z" fill="#1A1200"/></svg>Criar sala online<span class="setas" aria-hidden="true">»</span></button>
       ${S.temServidor ? `<div class="salas-abertas" id="salas-abertas">${htmlSalasAbertas()}</div>` : ''}
       <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px">
-        <input id="codigo" class="campo" maxlength="40" autocomplete="off" placeholder="Código ou link da sala" aria-label="Código ou link da sala" style="text-transform:uppercase" ${S.temServidor === false ? 'disabled' : ''}>
-        <button class="btn" type="button" id="entrar-codigo" ${S.temServidor === false ? 'disabled' : ''}>Entrar</button>
+        <div class="campo-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>
+        <input id="codigo" class="campo" maxlength="40" autocomplete="off" placeholder="Código ou link da sala" aria-label="Código ou link da sala" style="text-transform:uppercase" ${S.temServidor === false ? 'disabled' : ''}></div>
+        <button class="btn btn-ouro" type="button" id="entrar-codigo" ${S.temServidor === false ? 'disabled' : ''}>Entrar</button>
       </div>
       ${S.temServidor === false ? '<p class="ajuda" style="margin:0;text-align:center">O jogo online funciona no site do jogo (depois de publicado). Aqui dá para treinar contra os bots.</p>' : ''}
-      <button class="btn" type="submit">Treinar contra bots</button>
+      <button class="btn btn-grande" type="submit" style="min-height:56px;font-size:18px"><svg width="26" height="24" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="20" height="14" rx="5"/><path d="M13 7V3"/><circle cx="13" cy="2.5" r="1.5" fill="currentColor"/><circle cx="9.5" cy="14" r="1.6" fill="currentColor"/><circle cx="16.5" cy="14" r="1.6" fill="currentColor"/><path d="M1 13v3M25 13v3"/></svg>Treinar contra bots</button>
       ${S.erroInicio ? `<p class="aviso" role="status" style="height:auto;white-space:normal">${esc(S.erroInicio)}</p>` : ''}
     </form>
   </main>`;
@@ -596,7 +604,7 @@ function telaCriar() {
   <main class="tela">
     <div class="linha" style="justify-content:flex-start">
       <button class="btn btn-icone" id="voltar" aria-label="Voltar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <h1 style="font-size:28px">${online ? 'Criar sala online' : 'Criar sala de treino'}</h1>
+      <h1 class="titulo-tela">Criar sala ${online ? '<em>online</em>' : '<em>de treino</em>'}</h1>
       <span style="margin-left:auto">${botaoTelaCheia()}</span>
     </div>
     ${online ? `<section class="bloco">
@@ -1939,7 +1947,7 @@ function telaFim() {
   <main class="tela">
     <div class="bloco" style="align-items:center;text-align:center;gap:6px">
       <span class="rotulo">${rotulo}</span>
-      <h1 style="font-size:30px;color:var(--destaque)">${acabou ? `${esc(placarGeral[0].jogador === EU ? 'Você venceu' : placarGeral[0].nome.replace('Bot ', '') + ' venceu')} a partida!` : venc ? `${esc(venc === 'Você' ? 'Você venceu' : venc + ' venceu')}!` : 'Morte súbita!'}</h1>
+      <h1 class="titulo-vitoria">${acabou ? `${esc(placarGeral[0].jogador === EU ? 'Você venceu' : placarGeral[0].nome.replace('Bot ', '') + ' venceu')} a partida!` : venc ? `${esc(venc === 'Você' ? 'Você venceu' : venc + ' venceu')}!` : 'Morte súbita!'}</h1>
       <span style="color:var(--suave)">${acabou ? `${placarGeral[0].pontos} pontos no total` : venc ? 'Esvaziou a mão com números' : 'O monte acabou duas vezes'}</span>
     </div>
     <div class="tabela"><div class="lin cab"><span>Pos.</span><span>Jogador</span><span class="dir">Na mão</span><span class="dir">Ganhou</span></div>${linhas}</div>
@@ -2130,8 +2138,8 @@ async function desenharArte() {
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const c = cv.getContext('2d');
-  try { await Promise.all(['800 100px "Baloo 2"', '800 40px "Nunito"', '700 30px "Nunito"'].map((f) => document.fonts.load(f))); } catch { /* usa a fonte reserva */ }
-  const DISPLAY = '"Baloo 2", "Trebuchet MS", sans-serif', CORPO = 'Nunito, system-ui, sans-serif';
+  try { await Promise.all(['900 100px "Inter Display"', '800 40px "Inter"', '700 30px "Inter"'].map((f) => document.fonts.load(f))); } catch { /* usa a fonte reserva */ }
+  const DISPLAY = '"Inter Display", "Inter", sans-serif', CORPO = 'Inter, system-ui, sans-serif';
   const lista = placar(e).map((p) => {
     const j = e.jogadores.find((x) => x.id === p.jogador) || {};
     const foto = p.jogador === EU ? S.avatar : j.avatar;
@@ -2614,7 +2622,7 @@ function telaEntrar() {
   <main class="tela">
     <div class="linha" style="justify-content:flex-start">
       <button class="btn btn-icone" id="voltar" aria-label="Voltar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <h1 style="font-size:28px">Entrar na sala</h1>
+      <h1 class="titulo-tela">Entrar na <em>sala</em></h1>
       <span style="margin-left:auto">${botaoTelaCheia()}</span>
     </div>
     <div class="bloco" style="align-items:center;text-align:center">

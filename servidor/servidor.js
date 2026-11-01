@@ -21,7 +21,7 @@ const ESPERA_SALA = 3 * 60 * 1000;      // na sala de espera, quem caiu (ex.: fo
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // ---------------- site ----------------
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.woff': 'font/woff', '.woff2': 'font/woff2' };
 const CABECALHO = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
   + '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><base href="/">'
   + '<meta name="theme-color" content="#10162B"><link rel="manifest" href="/manifest.webmanifest">'

@@ -1412,8 +1412,9 @@ function efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf) {
     GIRO.turboAte = performance.now() + 1400; // a seta da mesa dá um giro rápido no sentido novo
     return;
   }
-  tocar('pular');
   const { pulados, destino } = efeito;
+  // o som do Pular toca cada vez que a bolinha da vez bloqueia alguém
+  pulados.forEach((_, k) => tocarDepois('pular', (k + 1) * SALTO - 120));
   const pontos = [idJog, ...pulados, destino].map(centroDoJogador);
   if (pontos.some((x) => !x)) return;
   // carimbos de bloqueio sobre quem foi pulado

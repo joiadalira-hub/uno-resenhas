@@ -333,6 +333,7 @@ function ligarBotaoSom() {
 }
 const S = {
   tela: 'inicio',
+  ordem: ler('ur-ordem', 'nada'), // como a mão aparece: num, num-inv, cor, nada
   apelido: ler('ur-apelido', ''),
   avatar: ler('ur-avatar', null),
   som: ler('ur-som', true),
@@ -503,8 +504,37 @@ function telaInicio() {
   app.innerHTML = `
   <main class="tela tela-inicio" style="position:relative">
     <div class="botoes-topo">${botoesZoom()}${botaoSom()}${botaoTelaCheia()}</div>
-    <img class="hero-img" src="hero.webp" alt="Uno Resenhas">
+    <div class="fx-fundo" aria-hidden="true">
+      <span class="orbe o1"></span><span class="orbe o2"></span><span class="orbe o3"></span><span class="orbe o4"></span>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <linearGradient id="nAzul" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9AD4FF"/><stop offset=".5" stop-color="#1988FF"/><stop offset="1" stop-color="#3B5BFF"/></linearGradient>
+        <linearGradient id="nVerm" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB0C0"/><stop offset=".5" stop-color="#FF3357"/><stop offset="1" stop-color="#C21746"/></linearGradient>
+        <linearGradient id="nRoxo" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0B8FF"/><stop offset=".5" stop-color="#AC4BFF"/><stop offset="1" stop-color="#6B3BFF"/></linearGradient>
+      </defs></svg>
+      ${[['tl', ['M 165 -8 C 95 20, 30 75, -8 175', 'M 120 -8 C 65 18, 22 55, -8 120'], 'nAzul', 0],
+         ['tr', ['M 135 -8 C 205 18, 270 70, 308 160'], 'nVerm', 0.7],
+         ['br', ['M 308 105 C 275 195, 215 265, 120 308', 'M 308 190 C 290 240, 255 280, 205 308'], 'nRoxo', 1.9],
+         ['bl', ['M -8 150 C 40 220, 100 275, 180 308'], 'nAzul', 1.3]]
+        .map(([canto, ds, g, atraso]) => `<svg class="neons ${canto}" viewBox="0 0 300 300">${ds.map((d, k) => `<g class="neon" style="--a:${atraso + k * 0.9}s">
+          <path d="${d}" stroke="url(#${g})" class="n-halo"/>
+          <path d="${d}" stroke="url(#${g})" class="n-corpo${k ? ' fino' : ''}"/>
+          <path d="${d}" class="n-luz" pathLength="100"/></g>`).join('')}</svg>`).join('')}
+      <span class="varredura"></span>
+    </div>
+    <div class="hero2" aria-hidden="true">
+      <svg class="anel-svg tras" viewBox="0 0 360 120"><defs><linearGradient id="gAnel" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF9F11"/><stop offset=".35" stop-color="#FFE27A"/><stop offset=".7" stop-color="#FFC21A"/><stop offset="1" stop-color="#FF9F11"/></linearGradient></defs>
+        <g transform="rotate(-7 180 60)"><path class="anel-halo" d="M 15 60 A 165 42 0 0 1 345 60"/><path class="anel-linha" d="M 15 60 A 165 42 0 0 1 345 60"/></g></svg>
+      <img class="h-carta c1" src="${PASTA}/roxo-0.webp?v=${VC}" alt="">
+      <img class="h-carta c2" src="${PASTA}/ctrl.webp?v=${VC}" alt="">
+      <img class="h-carta c3" src="${PASTA}/mais5.webp?v=${VC}" alt="">
+      <svg class="anel-svg frente" viewBox="0 0 360 120"><g transform="rotate(-7 180 60)"><path class="anel-halo" d="M 345 60 A 165 42 0 0 1 15 60"/><path class="anel-linha" d="M 345 60 A 165 42 0 0 1 15 60"/><path class="anel-brilho" pathLength="100" d="M 345 60 A 165 42 0 0 1 15 60"/></g></svg>
+      <svg class="raios r1" width="58" height="58" viewBox="0 0 58 58"><g stroke="#FFD21F" stroke-width="7" stroke-linecap="round"><path d="M14 10l12 17"/><path d="M36 4l3 16"/><path d="M5 38l18 1"/></g></svg>
+      <svg class="raios r2" width="58" height="58" viewBox="0 0 58 58"><g stroke="#FFD21F" stroke-width="7" stroke-linecap="round"><path d="M8 30l20-7"/><path d="M14 50l14-13"/><path d="M36 50l3-14"/></g></svg>
+    </div>
     <div class="logo">
+      <span class="coroa" aria-hidden="true"><svg width="40" height="28" viewBox="0 0 40 28"><defs><linearGradient id="gCoroa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF0A0"/><stop offset=".6" stop-color="#FFC61A"/><stop offset="1" stop-color="#FF9F11"/></linearGradient></defs><path d="M4 24L2 7l10 8 8-13 8 13 10-8-2 17z" fill="url(#gCoroa)" stroke="#B86A00" stroke-width="1.2" stroke-linejoin="round"/><circle cx="20" cy="3" r="2" fill="#FFF0A0"/><circle cx="2.5" cy="6.5" r="1.8" fill="#FFF0A0"/><circle cx="37.5" cy="6.5" r="1.8" fill="#FFF0A0"/></svg></span>
+      <h1 class="logo-titulo"><span class="uno">Uno</span> <span class="res">Resenhas</span></h1>
+      <svg class="risco" viewBox="0 0 260 16" aria-hidden="true"><defs><linearGradient id="gRisco" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFC21A" stop-opacity="0"/><stop offset=".25" stop-color="#FFC21A"/><stop offset=".75" stop-color="#FFE45C"/><stop offset="1" stop-color="#FF9F11" stop-opacity=".2"/></linearGradient></defs><path d="M4 12 C 70 1, 180 0, 256 5 C 180 6, 90 9, 4 12z" fill="url(#gRisco)"/></svg>
       <p class="slogan">${['', '', '', '', '4 cores, +4, Ctrl+C e muita resenha', '5 cores, +5, Ctrl+C e muita resenha', '6 cores, +6, Ctrl+C e muita resenha'][(S.config && S.config.opcoes && S.config.opcoes.cores) || 5]}</p>
     </div>
     <form id="f-inicio">
@@ -774,13 +804,47 @@ function htmlAvatar(j) {
   if (av) return `<img class="figurinha" src="${av}" alt="">`;
   return `<span class="inicial">${esc(j.nome.replace('Bot ', '')[0].toUpperCase())}</span>`;
 }
+// ---------- organizar a mão: por número (0→9 ou 9→0), por cor, ou do jeito que chegou ----------
+const ORDENS = [
+  ['num', 'Números 0 → 9 (especiais à direita)', '0→9'],
+  ['num-inv', 'Números 9 → 0 (especiais à esquerda)', '9→0'],
+  ['cor', 'Por cores', 'Cores'],
+  ['nada', 'Do jeito que chegam', 'Livre'],
+];
+const PESO_ESPECIAL = { pular: 10, reverso: 11, '+2': 12, coringa: 13, '+5': 14, ctrl: 15 };
+const pesoNum = (c) => (c.tipo === 'num' ? c.valor : PESO_ESPECIAL[c.tipo] ?? 16);
+function ordenarMao(mao) {
+  const o = S.ordem;
+  if (!o || o === 'nada') return mao;
+  const cores = coresAtuais();
+  const pesoCor = (c) => (c.cor ? cores.indexOf(c.cor) : cores.length);
+  const l = mao.map((c, i) => ({ c, i }));
+  if (o === 'num' || o === 'num-inv') l.sort((a, b) => pesoNum(a.c) - pesoNum(b.c) || pesoCor(a.c) - pesoCor(b.c) || a.i - b.i);
+  else l.sort((a, b) => pesoCor(a.c) - pesoCor(b.c) || pesoNum(a.c) - pesoNum(b.c) || a.i - b.i);
+  if (o === 'num-inv') l.reverse();
+  return l.map((x) => x.c);
+}
+function abrirOrdem() {
+  document.querySelectorAll('.fundo-ordem').forEach((x) => x.remove());
+  const f = document.createElement('div');
+  f.className = 'fundo-modal fundo-ordem';
+  f.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Organizar a mão">
+    <h2 style="font-size:22px">Organizar a mão</h2>
+    <div class="ordens">${ORDENS.map(([id, nome]) => `<button type="button" class="ordem-op" data-ordem="${id}" aria-pressed="${S.ordem === id}">${esc(nome)}</button>`).join('')}</div>
+    <button class="btn" id="ordem-fechar">Fechar</button></div>`;
+  document.body.appendChild(f);
+  f.querySelectorAll('[data-ordem]').forEach((b) => (b.onclick = () => { S.ordem = b.dataset.ordem; gravar('ur-ordem', S.ordem); f.remove(); if (S.tela === 'mesa') render(); }));
+  f.querySelector('#ordem-fechar').onclick = () => f.remove();
+  f.addEventListener('pointerdown', (ev) => { if (ev.target === f) f.remove(); });
+}
 function telaMesa() {
   telaDesenhada = null;
   if (deckPronto !== PASTA + modoCores()) preCarregarDeck(); // modo de cores novo: baixa as cartas dele
   const e = S.e, ui = S.ui, v = visaoDe(e, EU);
   const vez = minhaVez() && !ui.distribuindo && !ui.maoSegurada; // enquanto as cartas são distribuídas (ou as mãos trocam) ninguém joga
   const atuais = minhaMao().filter((c) => !(ui.pendentes && ui.pendentes.has(c.id)));
-  const mao = ui.maoSegurada || (ui.saindo && ui.maoAntes ? ui.maoAntes.filter((c) => ui.saindo.has(c.id) || atuais.some((x) => x.id === c.id)).map((c) => atuais.find((x) => x.id === c.id) || c) : atuais);
+  const maoBruta = ui.maoSegurada || (ui.saindo && ui.maoAntes ? ui.maoAntes.filter((c) => ui.saindo.has(c.id) || atuais.some((x) => x.id === c.id)).map((c) => atuais.find((x) => x.id === c.id) || c) : atuais);
+  const mao = ordenarMao(maoBruta);
   const fim = e.opcoes.fim;
   const rotRodada = fim.modo === 'rodadas' ? `Rodada ${e.rodada} de ${fim.valor}` : fim.modo === 'pontos' ? `Rodada ${e.rodada} · até ${fim.valor} pts` : e.opcoes.salaAberta ? `Mão ${e.rodada} · sala aberta` : fim.modo === 'vitorias' ? `Rodada ${e.rodada} · vitórias` : `Rodada ${e.rodada}`;
   const rivais = v.jogadores.filter((j) => j.id !== EU);
@@ -862,6 +926,7 @@ function telaMesa() {
       ${vulneravelRival ? `<button class="btn btn-perigo pegou-flutua" id="pegou">Pegou! <small>${esc(nomeJog(vulneravelRival).replace('Bot ', ''))} não disse Última</small></button>` : ''}
     </div>
     <div class="mao-zona">
+      <button type="button" class="btn-ordem" id="ordem" aria-haspopup="dialog" aria-label="Organizar a mão: ${esc(ORDENS.find((o) => o[0] === S.ordem)[1])}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>${esc(ORDENS.find((o) => o[0] === S.ordem)[2])}</button>
       ${ui.combo ? `<div class="painel-combo">
         <div class="linha"><span style="font:800 16px var(--display);color:var(--destaque)">Montando combo</span>${seqValida && !seqValida.ok ? `<span class="ajuda" style="color:#FF8A82">${esc(seqValida.mensagem)}</span>` : ''}</div>
         <div class="fichas">${fichas}</div></div>` : ''}
@@ -921,6 +986,7 @@ function ligarMesa() {
   if ($('cancelar')) $('cancelar').onclick = () => { S.ui.combo = false; S.ui.seq = []; S.ui.aviso = ''; render(); };
   if ($('jogar-combo')) $('jogar-combo').onclick = () => prepararJogada([...S.ui.seq]);
   if ($('ultima')) $('ultima').onclick = () => agir({ tipo: 'ultima', jogador: EU });
+  if ($('ordem')) $('ordem').onclick = abrirOrdem;
   if ($('pegou')) $('pegou').onclick = () => agir({ tipo: 'pegou', jogador: EU, alvo: S.e.vulneravel });
   if ($('apertar9')) $('apertar9').onclick = () => agir({ tipo: 'apertar9', jogador: EU });
   ligarBotaoSom();
@@ -1109,7 +1175,7 @@ function posAcao(acao, r, jogada, antes) {
     } else {
     const durU = DURACAO_ULTIMA + duracaoVooMao(jogada.fisicas.length) + (simples ? 350 : 0);
     const soltarU = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; ui.pousou = true; if (S.tela === 'mesa') render(); ui.pousou = false; } };
-    const itensU = itensDaJogada(jogada);
+    const itensU = jogada.fisicas.map((c) => ({ src: imgCarta(c) })); // como saiu da mão: coringa/+N/Ctrl+C ainda pretos (a cor aparece no monte)
     const comecar = () => {
       if (S.ui !== ui) return;
       const palco = mostrarUltima(ator1.id, true, null, durU, { itens: itensU, aoMonte: simples ? soltarU : null });

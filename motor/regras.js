@@ -415,6 +415,7 @@ function passar(e, acao) {
 }
 
 function ultima(e, acao) {
+  if (e.fase !== 'jogando') throw new ErroJogada('fase', 'A mão já acabou');
   const j = e.jogadores[idx(e, acao.jogador)];
   if (j.mao.length > 2) throw new ErroJogada('ultima', 'Você tem mais de 2 cartas');
   e.disseUltima[j.id] = true;
@@ -422,6 +423,7 @@ function ultima(e, acao) {
 }
 
 function pegou(e, acao) {
+  if (e.fase !== 'jogando') throw new ErroJogada('fase', 'A mão já acabou');
   idx(e, acao.jogador);
   const alvo = e.jogadores[idx(e, acao.alvo)];
   if (e.vulneravel !== alvo.id || alvo.mao.length !== 1) throw new ErroJogada('pegou', 'Esse jogador já está seguro');

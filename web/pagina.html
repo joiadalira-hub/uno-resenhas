@@ -30,7 +30,7 @@
   color-scheme: dark;
   --rk: 0.065; /* arredondamento de TODA carta (mão, mesa, monte, animações, os dois decks): 6,5% da largura */
 }
-html, body { height: 100%; }
+html, body { height: 100%; margin: 0; }
 body { background: var(--chao); color: var(--texto); font-family: var(--corpo); font-size: 15px; overflow: hidden; }
 button { font-family: var(--corpo); color: inherit; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--destaque); outline-offset: 2px; }
@@ -740,6 +740,27 @@ body.paisagem .tela-inicio .botoes-topo { grid-column: auto; }
   body.paisagem .logo-titulo { font-size: 40px !important; }
   body.paisagem .tela-inicio .logo .risco { width: 190px; }
 }
+/* com zoom ou tela pequena nada pode sumir: o topo da mesa encolhe e o texto da rodada corta com reticências */
+.topo-mesa { gap: 6px; min-width: 0; }
+.topo-mesa > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topo-mesa > span:last-child { flex: none; }
+body.apertado .topo-mesa .btn-icone { width: 36px; height: 36px; min-height: 36px; border-radius: 11px; }
+body.apertado .topo-mesa .btn-icone svg { width: 18px; height: 18px; }
+body.apertado .topo-mesa > span:last-child { gap: 4px !important; }
+body.apertado .relogio { min-width: 46px; height: 36px; font-size: 14px; }
+body.apertado .acoes .btn { font-size: 15px; padding: 0 4px; }
+body.baixo .mesa { gap: 6px; padding-block: 6px; }
+body.baixo:not(.paisagem) .acoes .btn { min-height: 50px; }
+body.baixo:not(.paisagem) .eu-canto { width: 86px; }
+body.baixo:not(.paisagem) .eu-canto .avatar.eu-avatar { width: 52px; height: 52px; }
+body.paisagem .arena { height: auto !important; } /* deitado: a mesa ocupa o que sobra (nada empurra a mão para fora) */
+/* pouco espaço (tela pequena ou muito zoom): fotos e leques dos adversários menores, botões compactos */
+body.apertado .assento, body.baixo.paisagem .assento { transform: translate(-50%, -50%) scale(.78); }
+body.apertado:not(.paisagem) .eu-canto { width: 72px; }
+body.apertado:not(.paisagem) .eu-canto .avatar.eu-avatar { width: 50px; height: 50px; }
+body.apertado:not(.paisagem) .eu-canto .avatar .inicial { font-size: 22px; border-width: 3px; }
+body.apertado:not(.paisagem) .acoes { gap: 5px; }
+body.apertado:not(.paisagem) .acoes .btn { font-size: 13px; padding: 0 2px; border-radius: 12px; }
 </style>
 
 <div id="app"></div>

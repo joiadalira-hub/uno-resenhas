@@ -536,9 +536,12 @@ function montarFundoAnimado() {
 S.leve = ler('ur-leve', window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 function aplicarLeve() { document.body.classList.toggle('modo-leve', !!S.leve); }
 // Celular deitado, tablet ou computador (tela mais larga que alta): layout horizontal
-const ehPaisagem = () => { const z = ZOOM.valor, W = window.innerWidth / z, H = window.innerHeight / z; return W > H * 1.15 && W >= 560; };
+const ehPaisagem = () => { const z = ZOOM.valor, W = window.innerWidth / z, H = window.innerHeight / z; return W > H * 1.15; };
 function render() {
   document.body.classList.toggle('paisagem', ehPaisagem());
+  // tela estreita (ou com muito zoom): botões do topo menores para tudo caber
+  document.body.classList.toggle('apertado', window.innerWidth / ZOOM.valor < 400);
+  document.body.classList.toggle('baixo', window.innerHeight / ZOOM.valor < 640);
   montarFundoAnimado();
   aplicarLeve();
   document.body.dataset.tela = S.tela; // a mesa usa um fundo mais calmo
@@ -899,8 +902,11 @@ function telaMesa() {
   const W = window.innerWidth / ZOOM.valor, H = window.innerHeight / ZOOM.valor;
   const deitado = ehPaisagem();
   // deitado: a altura é o que falta, então cartas medidas pela altura e a coluna de botões fica à direita
-  const cw = Math.round((deitado ? Math.max(54, Math.min(H * 0.17, W * 0.1, 120)) : Math.max(84, Math.min(W * 0.25, H * 0.16, 150))) * ZOOM.mao);
-  const cwTopo = Math.round((deitado ? Math.max(56, Math.min(H * 0.165, 130)) : Math.max(96, Math.min(W * 0.27, H * 0.16, 160))) * ZOOM.mesa);
+  // o "tamanho das cartas" do painel da lupa aumenta até o limite que ainda cabe na tela (nada some com zoom)
+  const tetoMao = deitado ? (H * 0.34 - 18) / 1.78 : (H * 0.25 - 18) / 1.78;
+  const tetoMesa = deitado ? H * 0.27 / 1.54 : H * 0.2 / 1.54;
+  const cw = Math.round(Math.max(40, Math.min(tetoMao, (deitado ? Math.max(54, Math.min(H * 0.17, W * 0.1, 120)) : Math.max(84, Math.min(W * 0.25, H * 0.16, 150))) * ZOOM.mao)));
+  const cwTopo = Math.round(Math.max(44, Math.min(tetoMesa, W * 0.3, (deitado ? Math.max(56, Math.min(H * 0.165, 130)) : Math.max(96, Math.min(W * 0.27, H * 0.16, 160))) * ZOOM.mesa)));
   const larguraMao = deitado ? Math.min(W, 1400) - Math.max(130, Math.min(W * 0.18, 220)) - 56 : Math.min(W, 1100) - 40;
   const passoCarta = mao.length <= 1 ? cw : Math.max(cw * 0.3, Math.min(cw * 0.86, (larguraMao - cw) / (mao.length - 1)));
   const sobrepor = Math.round(passoCarta - cw);
@@ -910,7 +916,8 @@ function telaMesa() {
   const chaveLayout = `${Math.round(W)}x${Math.round(H)}x${ZOOM.valor}x${ZOOM.mao}x${ZOOM.mesa}x${rivais.map((j) => j.id).join(',')}`;
   const fixo = S.layoutMesa && S.layoutMesa.chave === chaveLayout ? S.layoutMesa : null;
   const assentos = (fixo ? fixo.pos : posicoesAssentos(rivais.length)).map((pos, k) => ({ j: rivais[k], ...pos }));
-  const vulneravelRival = e.vulneravel && e.vulneravel !== EU ? e.vulneravel : null;
+  const jogando = e.fase === 'jogando'; // a mão acabou (alguém bateu): nenhum botão de jogada fica ativo
+  const vulneravelRival = jogando && e.vulneravel && e.vulneravel !== EU ? e.vulneravel : null;
 
   const fichas = ui.seq.length
     ? resolverSequencia(e, ui.seq.map((id) => mao.find((c) => c.id === id))).map((ef, i) => {
@@ -991,7 +998,7 @@ function telaMesa() {
         <button class="btn btn-principal duplo" id="jogar-combo" ${seqValida && seqValida.ok ? '' : 'disabled'}>Jogar ${ui.seq.length || ''} ${ui.seq.length === 1 ? 'carta' : 'cartas'}</button>`
       : `${e.comprou && vez ? '<button class="btn" id="passar">Passar</button>' : `<button class="btn" id="comprar" ${vez ? '' : 'disabled'}>${v.compraPendente && vez ? `Comprar ${v.compraPendente.quantidade}` : 'Comprar'}</button>`}
         ${v.podeDesafiar ? `<button class="btn btn-perigo" id="desafiar">Desafiar ${nomeMaisN()}</button>` : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
-        <button class="btn ${mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${mao.length <= 2 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
+        <button class="btn ${jogando && mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${jogando && minhaMao().length <= 2 && minhaMao().length > 0 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
       </div>
     </div>
   </main>

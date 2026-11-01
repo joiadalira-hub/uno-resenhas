@@ -332,3 +332,17 @@ test('depois de comprar dá para jogar qualquer carta da mão', () => {
   aplicar(e2, { tipo: 'comprar', jogador: 'j1' });
   assert.equal(e2.vez, 1);
 });
+
+test('corte só com mesmo número e mesma cor', () => {
+  const topo = N('azul', 7);
+  const vermelho7 = N('vermelho', 7), azul7 = N('azul', 7);
+  const e = mesa({ maos: [extras(), [vermelho7, azul7, ...extras()], extras()], topo, opcoes: { corte: true }, vez: 0 });
+  assert.throws(() => aplicar(e, { tipo: 'corte', jogador: 'j2', cartas: [vermelho7.id] }));
+  aplicar(e, { tipo: 'corte', jogador: 'j2', cartas: [azul7.id] });
+  assert.equal(e.vez !== 0, true);
+  // Regra do 5 mudou a cor: um 5 da cor escolhida NÃO corta (a carta de verdade é de outra cor)
+  const cinco = N('verde', 5), cincoAzul = N('azul', 5);
+  const e2 = mesa({ maos: [[cinco, ...extras()], [cincoAzul, ...extras()], extras()], topo: N('verde', 3), opcoes: { corte: true, regraDo5: true }, vez: 0 });
+  aplicar(e2, { tipo: 'jogar', jogador: 'j1', cartas: [cinco.id], cor: 'azul' });
+  assert.throws(() => aplicar(e2, { tipo: 'corte', jogador: 'j2', cartas: [cincoAzul.id] }));
+});

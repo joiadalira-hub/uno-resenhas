@@ -181,8 +181,11 @@ function checarJogada(e, idJogador, idsCartas, { foraDaVez }) {
 
   if (foraDaVez) {
     if (!e.opcoes.corte) throw new ErroJogada('corte', 'Corte desligado nesta sala');
-    const t = e.topo;
-    if (cartas.length !== 1 || cartas[0].tipo !== 'num' || t.tipo !== 'num' || cartas[0].valor !== t.valor || cartas[0].cor !== t.cor || e.compraPendente) throw new ErroJogada('corte', 'Corte só com carta idêntica ao topo');
+    // idêntica à carta de verdade do topo: mesmo número E mesma cor (a cor escolhida pela Regra do 5 ou pelo Ctrl+C não vale)
+    const t = e.topo, fis = e.descarte[e.descarte.length - 1];
+    const c = cartas[0];
+    const igual = (x) => x && x.tipo === 'num' && x.valor === c.valor && x.cor === c.cor;
+    if (cartas.length !== 1 || c.tipo !== 'num' || !igual(t) || !igual(fis) || e.compraPendente) throw new ErroJogada('corte', 'Corte só com carta idêntica ao topo: mesmo número e mesma cor');
   }
 
   // Só se vence com números

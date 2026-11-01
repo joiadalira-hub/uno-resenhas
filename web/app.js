@@ -1084,11 +1084,33 @@ function posAcao(acao, r, jogada, antes) {
   const jogouAvisado = !!jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !troca && ator1 && ator1.mao.length === 1 && S.e.vulneravel !== ator1.id;
   // Antes de tudo: as cartas saem da mão de quem jogou, viradas para cima.
   // Ação (combo, Pular, Reverso) vai direto para a base da ação no palco; o resto vai para o monte.
-  const vaiAoPalco = !!jogada && acao.tipo === 'jogar' && !!(combo || efeito) && !jogouAvisado && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const voo = jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !vaiAoPalco ? voarDaMao(acao.jogador, jogada.fisicas, antes) : 0;
+  const reduz = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const vaiAoPalco = !!jogada && acao.tipo === 'jogar' && !!(combo || efeito) && !jogouAvisado && !reduz;
+  // avisou "Última!": as cartas voam para o palco do ÚLTIMA! (viradas para cima), não para o monte
+  const ultimaComCartas = jogouAvisado && !reduz;
+  const voo = jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !vaiAoPalco && !ultimaComCartas ? voarDaMao(acao.jogador, jogada.fisicas, antes) : 0;
   if (voo) ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + voo);
   let antesDaCarta = voo; // corte e ÚLTIMA começam quando as cartas chegam
-  if (jogouAvisado) {
+  if (ultimaComCartas) {
+    // ÚLTIMA! com as cartas jogadas no meio (como um combo); carta simples vai dali para o monte,
+    // combo / Pular / Reverso / corte seguem com a animação deles logo depois
+    const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
+    const marca = (ui.marcaTopo || 0) + 1;
+    ui.marcaTopo = marca;
+    ui.topoSegurado = antes.topo;
+    const simples = !(acao.tipo === 'corte' || combo || efeito);
+    const durU = DURACAO_ULTIMA + duracaoVooMao(jogada.fisicas.length) + (simples ? 350 : 0);
+    const soltarU = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; ui.pousou = true; if (S.tela === 'mesa') render(); ui.pousou = false; } };
+    const itensU = itensDaJogada(jogada);
+    const comecar = () => {
+      if (S.ui !== ui) return;
+      const palco = mostrarUltima(ator1.id, true, null, durU, { itens: itensU, aoMonte: simples ? soltarU : null });
+      if (palco) voarDaMao(acao.jogador, jogada.fisicas, antes, palco); else if (simples) soltarU();
+    };
+    if (atraso) setTimeout(comecar, atraso); else comecar();
+    antesDaCarta = atraso + durU - (simples ? 0 : 250);
+    ui.comboAte = Date.now() + antesDaCarta;
+  } else if (jogouAvisado) {
     const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
     const marca = (ui.marcaTopo || 0) + 1;
     ui.marcaTopo = marca;
@@ -1127,7 +1149,7 @@ function posAcao(acao, r, jogada, antes) {
     if (antesDaCarta) {
       const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
       ui.comboAte = Date.now() + antesDaCarta + duracoesJogada(itens.length, efeito, q).total;
-      depois(() => { ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar); });
+      depois(() => { ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar, ultimaComCartas ? 'todas' : false); });
     } else if (vaiAoPalco) {
       const fim = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar, true);
       if (comboAtivo) voarDaMao(acao.jogador, jogada.fisicas, antes, comboAtivo);
@@ -1310,6 +1332,7 @@ function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false) {
   const { palco, area, r } = p;
   montarEfeito(area, r, idJog, combo ? 'COMBO!' : nomeEf, combo ? '' : subEf, itens);
   if (daMao) palco.classList.add('da-mao'); // as cartas chegam voando da mão, não caem do alto
+  if (daMao === 'todas') palco.querySelectorAll('.combo-carta').forEach((x) => x.classList.add('chegou')); // já vieram do ÚLTIMA!
   comboAtivo = palco;
   const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (combo) tocar('combo');
@@ -1674,17 +1697,31 @@ function saiuCarta(id, n) {
 
 // ---------- ÚLTIMA! / ESQUECEU! quando alguém fica com uma carta ----------
 const DURACAO_ULTIMA = 1500;
-function mostrarUltima(id, disse, subPegou, dur = DURACAO_ULTIMA) {
-  const p = criarPalco('ultima-show ' + (disse ? 'disse' : 'esqueceu'), disse ? `${nomeJog(id)}: Última!` : `${nomeJog(id)} esqueceu de dizer Última`);
-  if (!p) return;
-  const { palco, area } = p;
+// cartas: { itens, aoMonte } — mostra as cartas jogadas (viradas para cima) no lugar do verso;
+// com aoMonte, no fim elas vão do palco para o monte
+function mostrarUltima(id, disse, subPegou, dur = DURACAO_ULTIMA, cartas = null) {
+  const p = criarPalco('ultima-show ' + (disse ? 'disse' : 'esqueceu') + (cartas ? ' da-mao' : ''), disse ? `${nomeJog(id)}: Última!` : `${nomeJog(id)} esqueceu de dizer Última`);
+  if (!p) return null;
+  const { palco, area, r } = p;
   const eu = id === EU;
   const sub = disse ? 'Só falta 1 carta' : subPegou || (eu ? 'Você não disse Última!' : 'Não disse Última!');
-  area.innerHTML = `<div class="efeito-col">${htmlCabecalho(id, disse ? 'ÚLTIMA!' : 'ESQUECEU!', sub)}
+  if (cartas) {
+    montarEfeito(area, r, id, 'ÚLTIMA!', sub, cartas.itens);
+    const n = cartas.itens.length;
+    if (n > 1) setTimeout(() => palco.isConnected && palco.classList.add('espalha'), duracaoVooMao(n) + 120); // abre como no combo
+    if (cartas.aoMonte) {
+      const tRec = dur - 350 - 330;
+      setTimeout(() => { if (palco.isConnected) recolherNaPilha(palco, 110, 300); }, tRec);
+      setTimeout(() => cartas.aoMonte(), tRec + 300 + (n - 1) * 110);
+    }
+  } else {
+    area.innerHTML = `<div class="efeito-col">${htmlCabecalho(id, disse ? 'ÚLTIMA!' : 'ESQUECEU!', sub)}
     <div class="ultima-carta"><span class="verso"></span></div></div>`;
+  }
   tocar(disse ? 'ultima' : 'erro');
   setTimeout(() => palco.classList.add('sai'), dur - 350);
   setTimeout(() => palco.remove(), dur);
+  return palco;
 }
 
 // ---------- animação do Pular: a vez salta por cima dos bloqueados ----------

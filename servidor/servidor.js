@@ -324,6 +324,7 @@ class Sala {
     const e = this.e;
     if (e.fase !== 'jogando') { this.ultimaAtividade = Date.now(); return; }
     const espera = this.esperaAnimacao(evento);
+    this.animaAte = Date.now() + espera; // até aqui ninguém joga (a animação ainda roda nos celulares)
     if (e.regra9) {
       for (const j of e.jogadores) if (j.bot && !e.regra9.apertaram.includes(j.id)) {
         this.depois(espera + 450 + randomInt(2200), () => { if (this.e.regra9 && !this.e.regra9.apertaram.includes(j.id)) this.agir({ tipo: 'apertar9', jogador: j.id }, j.id); });
@@ -484,6 +485,13 @@ function tratar(conexao, msg, ctx) {
   if (tipo === 'acao') {
     const acao = { ...(msg.acao || {}), jogador: assento.id };
     if (['tempo9', 'proxima_rodada'].includes(acao.tipo)) return;
+    const falta = (sala.animaAte || 0) - 400 - Date.now(); // 400 ms de folga para a rede
+    if (falta > 0 && ['jogar', 'comprar', 'passar', 'desafiar'].includes(acao.tipo)) {
+      // chegou antes da animação acabar: vale assim que ela terminar
+      const e0 = sala.e;
+      setTimeout(() => { if (sala.e !== e0) return; try { sala.agir(acao, assento.id); } catch (err) { erro(conexao, err.message); } }, falta + 400);
+      return;
+    }
     try { sala.agir(acao, assento.id); } catch (err) { erro(conexao, err.message); }
     return;
   }

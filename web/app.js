@@ -94,7 +94,7 @@ function aplicarZoom() {
   app.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
 }
 // um botão só (lupa) abre o painel: zoom da tela, tamanho das cartas da mão e das cartas da mesa
-const botoesZoom = () => `<button class="btn btn-icone" id="visual" aria-label="Deck, zoom e tamanho das cartas" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg></button>`;
+const botoesZoom = () => `<button class="btn btn-icone" id="visual" aria-label="Configurações: deck, zoom, modo noturno" aria-haspopup="dialog"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>`;
 const AJUSTES = [
   ['valor', 'ur-zoom', 'Zoom da tela', 'Aumenta ou diminui tudo'],
   ['mao', 'ur-tam-mao', 'Cartas da mão', 'Só as suas cartas'],
@@ -108,12 +108,13 @@ function abrirPainelVisual(botao) {
   const pn = document.createElement('div');
   pn.className = 'painel-som painel-visual';
   pn.setAttribute('role', 'dialog');
-  pn.setAttribute('aria-label', 'Zoom e tamanho das cartas');
+  pn.setAttribute('aria-label', 'Configurações');
   pn.style.top = (r.bottom + 8) + 'px';
   document.body.appendChild(pn);
   desenharPainelVisual();
   const w = pn.offsetWidth;
   pn.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+  pn.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 16) + 'px';
   const fechar = (ev) => { if (!pn.contains(ev.target) && !ev.target.closest('#visual')) { pn.remove(); document.removeEventListener('pointerdown', fechar, true); } };
   setTimeout(() => document.addEventListener('pointerdown', fechar, true), 0);
 }
@@ -121,14 +122,17 @@ function desenharPainelVisual() {
   const pn = document.querySelector('.painel-visual');
   if (!pn) return;
   // o deck vem primeiro: é a escolha que mais se procura aqui dentro da mesa
-  pn.innerHTML = `<span class="ps-titulo">Deck das cartas</span>${htmlEscolhaDeck()}<div class="ps-sep"></div>` + AJUSTES.map(([k, , nome, ajuda]) => `<div class="ps-linha"><span style="display:flex;flex-direction:column"><span class="ps-titulo">${nome}</span><span class="ajuda">${ajuda}</span></span>
+  pn.innerHTML = `<span class="ps-cab">Configurações</span><span class="ps-titulo">Deck das cartas</span>${htmlEscolhaDeck()}<div class="ps-sep"></div>` + AJUSTES.map(([k, , nome, ajuda]) => `<div class="ps-linha"><span style="display:flex;flex-direction:column"><span class="ps-titulo">${nome}</span><span class="ajuda">${ajuda}</span></span>
     <div class="passo"><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="-1" aria-label="Diminuir ${nome}" ${ZOOM[k] <= 0.6 ? 'disabled' : ''}>−</button><span style="min-width:52px;font-size:17px">${Math.round(ZOOM[k] * 100)}%</span><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="1" aria-label="Aumentar ${nome}" ${ZOOM[k] >= 1.6 ? 'disabled' : ''}>+</button></div></div>`).join('')
-    + `<div class="ps-sep"></div><label class="chave" for="ps-leve"><span style="display:flex;flex-direction:column"><span class="ps-titulo">Modo leve</span><span class="ajuda">Desliga os efeitos de luz do fundo (celular mais fraco)</span></span><input type="checkbox" id="ps-leve" ${S.leve ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label>`
+    + `<div class="ps-sep"></div><label class="chave" for="ps-noturno"><span style="display:flex;flex-direction:column"><span class="ps-titulo">Modo noturno</span><span class="ajuda">Fundo bem escuro. Desligado, o fundo fica mais claro</span></span><input type="checkbox" id="ps-noturno" ${S.noturno ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label>`
+    + `<label class="chave" for="ps-leve"><span style="display:flex;flex-direction:column"><span class="ps-titulo">Modo leve</span><span class="ajuda">Desliga os efeitos de luz do fundo (celular mais fraco)</span></span><input type="checkbox" id="ps-leve" ${S.leve ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label>`
     + '<button type="button" class="link" id="aj-padrao" style="align-self:center">Voltar ao padrão</button>';
   ligarEscolhaDeck(pn);
   pn.querySelectorAll('[data-deck]').forEach((b) => b.addEventListener('click', () => setTimeout(desenharPainelVisual, 0)));
   pn.querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => mudarAjuste(b.dataset.aj, Number(b.dataset.d) * 0.1)));
   const leve = pn.querySelector('#ps-leve');
+  const not = pn.querySelector('#ps-noturno');
+  if (not) not.onchange = () => { S.noturno = not.checked; gravar('ur-noturno', S.noturno); aplicarNoturno(); };
   if (leve) leve.onchange = () => { S.leve = leve.checked; gravar('ur-leve', S.leve); aplicarLeve(); };
   pn.querySelector('#aj-padrao').onclick = () => { for (const [k, chave] of AJUSTES) { ZOOM[k] = 1; gravar(chave, 1); } aplicarZoom(); render(); desenharPainelVisual(); };
 }
@@ -141,7 +145,7 @@ function mudarAjuste(k, d) {
   desenharPainelVisual();
   // o painel acompanha o botão (o zoom muda a posição dele)
   const b = document.getElementById('visual'), pn = document.querySelector('.painel-visual');
-  if (b && pn) { const r = b.getBoundingClientRect(), w = pn.offsetWidth; pn.style.top = (r.bottom + 8) + 'px'; pn.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px'; }
+  if (b && pn) { const r = b.getBoundingClientRect(), w = pn.offsetWidth; pn.style.top = (r.bottom + 8) + 'px'; pn.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px'; pn.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 16) + 'px'; }
 }
 // ---------- tela cheia: disponível em todas as telas (fica valendo ao trocar de tela) ----------
 const iconeTelaCheia = () => (document.fullscreenElement ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>');
@@ -174,6 +178,7 @@ function abrirPainelSom(botao) {
   desenharPainelSom();
   const w = pn.offsetWidth; // alinhado ao botão, mas sempre inteiro na tela
   pn.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+  pn.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 16) + 'px';
   const fechar = (ev) => { if (!pn.contains(ev.target) && ev.target.id !== 'som' && !ev.target.closest('#som')) { pn.remove(); document.removeEventListener('pointerdown', fechar, true); } };
   setTimeout(() => document.addEventListener('pointerdown', fechar, true), 0);
 }
@@ -535,6 +540,8 @@ function montarFundoAnimado() {
 // Modo leve: sem os efeitos de fundo (celular fraco ou "reduzir movimento")
 S.leve = ler('ur-leve', window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 function aplicarLeve() { document.body.classList.toggle('modo-leve', !!S.leve); }
+S.noturno = ler('ur-noturno', true);
+function aplicarNoturno() { document.body.classList.toggle('modo-dia', !S.noturno); }
 // Celular deitado, tablet ou computador (tela mais larga que alta): layout horizontal
 const ehPaisagem = () => { const z = ZOOM.valor, W = window.innerWidth / z, H = window.innerHeight / z; return W > H * 1.15; };
 function render() {
@@ -544,6 +551,7 @@ function render() {
   document.body.classList.toggle('baixo', window.innerHeight / ZOOM.valor < 640);
   montarFundoAnimado();
   aplicarLeve();
+  aplicarNoturno();
   document.body.dataset.tela = S.tela; // a mesa usa um fundo mais calmo
   // a página em si nunca rola (só as telas por dentro): se algo a empurrou, volta ao lugar
   if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0);
@@ -589,8 +597,6 @@ function telaInicio() {
       </div>
       <label for="apelido" class="rotulo-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.5" r="4.5"/><path d="M3 21c0-4.4 4-7.5 9-7.5s9 3.1 9 7.5z"/></svg>Seu apelido</label>
       <input id="apelido" class="campo" maxlength="14" autocomplete="nickname" value="${esc(S.apelido)}" placeholder="Como te chamam na mesa">
-      <span class="rotulo-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5l9 4.5 9-4.5"/></svg>Deck das cartas</span>
-      ${htmlEscolhaDeck()}
       <button class="btn btn-principal btn-grande" style="margin-top:8px" type="button" id="criar-online" ${S.temServidor === false ? 'disabled' : ''}><svg class="ico" width="22" height="26" viewBox="0 0 22 26" aria-hidden="true"><path d="M13 1L2 15h7l-2 10 11-14h-7z" fill="#1A1200"/></svg>Criar sala online<span class="setas" aria-hidden="true">»</span></button>
       ${S.temServidor ? `<div class="salas-abertas" id="salas-abertas">${htmlSalasAbertas()}</div>` : ''}
       <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px">
@@ -876,11 +882,18 @@ function abrirOrdem() {
   f.querySelector('#ordem-fechar').onclick = () => f.remove();
   f.addEventListener('pointerdown', (ev) => { if (ev.target === f) f.remove(); });
 }
+// a próxima jogada só vale depois que a animação atual terminar (evita cartas e efeitos se atropelando)
+let timerFimAnim = null;
+const temRelogio = () => (S.online ? !!(S.online.sala && S.online.sala.config && S.online.sala.config.tempo) || !!S.ui.prazoServidor : !!(S.config && S.config.tempo));
+const emAnimacao = () => ((S.ui && S.ui.comboAte) || 0) > Date.now();
+const ESPERA_ANIM = new Set(['jogar', 'comprar', 'passar', 'desafiar', 'aceitar']);
 function telaMesa() {
   telaDesenhada = null;
   if (deckPronto !== PASTA + modoCores()) preCarregarDeck(); // modo de cores novo: baixa as cartas dele
   const e = S.e, ui = S.ui, v = visaoDe(e, EU);
-  const vez = minhaVez() && !ui.distribuindo && !ui.maoSegurada; // enquanto as cartas são distribuídas (ou as mãos trocam) ninguém joga
+  // enquanto as cartas são distribuídas, as mãos trocam ou uma animação roda, ninguém joga
+  const vez = minhaVez() && !ui.distribuindo && !ui.maoSegurada && !emAnimacao();
+  if (minhaVez() && emAnimacao()) { clearTimeout(timerFimAnim); timerFimAnim = setTimeout(() => { if (S.tela === 'mesa' && S.e && S.ui === ui) render(); }, Math.max(30, (ui.comboAte || 0) - Date.now() + 30)); }
   const atuais = minhaMao().filter((c) => !(ui.pendentes && ui.pendentes.has(c.id)));
   const maoBruta = ui.maoSegurada || (ui.saindo && ui.maoAntes ? ui.maoAntes.filter((c) => ui.saindo.has(c.id) || atuais.some((x) => x.id === c.id)).map((c) => atuais.find((x) => x.id === c.id) || c) : atuais);
   const mao = ordenarMao(maoBruta);
@@ -927,6 +940,8 @@ function telaMesa() {
     }).join('')
     : '<span class="ajuda" style="align-self:center">Toque nas cartas na ordem em que quer jogar</span>';
 
+  // a mão não volta para o começo a cada toque (montando combo, comprando, etc.)
+  const rolagemMao = (() => { const w = document.querySelector('.mao-wrap'); return w ? w.scrollLeft : null; })();
   app.innerHTML = `
   <main class="mesa ${ui.distribuindo ? 'distribuindo' : ''}" style="--cw:${cw}px;--cw-topo:${cwTopo}px;--cor-atual:${VAR_COR[v.corAtual]}">
     <div class="topo-mesa">
@@ -936,7 +951,7 @@ function telaMesa() {
         ${botoesZoom()}
         ${botaoSom()}
         ${botaoTelaCheia()}
-        <span class="relogio ${vez && restam !== null ? (restam <= 5 ? 'urgente' : 'ativo') : ''}" id="relogio" aria-live="off">${vez && restam !== null ? restam + ' s' : '—'}</span>
+        ${temRelogio() ? `<span class="relogio ${vez && restam !== null ? (restam <= 5 ? 'urgente' : 'ativo') : ''}" id="relogio" aria-live="off">${vez && restam !== null ? restam + ' s' : '—'}</span>` : ''}
       </span>
     </div>
     <div class="arena" ${fixo ? `style="flex:none;height:${fixo.h}px"` : ''}>
@@ -961,6 +976,7 @@ function telaMesa() {
         <span class="pilula">${v.monte} no monte</span>
         ${v.cartaDoTopo.tipo === 'ctrl' ? `<span class="pilula">Ctrl+C virou ${esc(nomeCarta(v.topo))}</span>` : ''}
         ${v.compraPendente ? `<span class="pilula compra">Compra acumulada: ${v.compraPendente.quantidade}</span>` : ''}
+  <button type="button" class="btn-ordem" id="ordem" aria-haspopup="dialog" aria-label="Organizar a mão: ${esc(ORDENS.find((o) => o[0] === S.ordem)[1])}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>${esc(ORDENS.find((o) => o[0] === S.ordem)[2])}</button>
       </div>
     ${v.regra9 ? (() => {
       const jaApertei = v.regra9.apertaram.includes(EU);
@@ -971,7 +987,6 @@ function telaMesa() {
       ${vulneravelRival ? `<button class="btn btn-perigo pegou-flutua" id="pegou">Pegou! <small>${esc(nomeJog(vulneravelRival).replace('Bot ', ''))} não disse Última</small></button>` : ''}
     </div>
     <div class="mao-zona">
-      <button type="button" class="btn-ordem" id="ordem" aria-haspopup="dialog" aria-label="Organizar a mão: ${esc(ORDENS.find((o) => o[0] === S.ordem)[1])}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>${esc(ORDENS.find((o) => o[0] === S.ordem)[2])}</button>
       ${ui.combo ? `<div class="painel-combo">
         <div class="linha"><span style="font:800 16px var(--display);color:var(--destaque)">Montando combo</span>${seqValida && !seqValida.ok ? `<span class="ajuda" style="color:#FF8A82">${esc(seqValida.mensagem)}</span>` : ''}</div>
         <div class="fichas">${fichas}</div></div>` : ''}
@@ -1017,6 +1032,16 @@ function telaMesa() {
   }
   if (!ui.distribuindo && !ui.topoSegurado) ui.ultimaCarta = v.cartaDoTopo.id; // segurada: a carta ainda vai cair
   ui.treme = null;
+  if (rolagemMao !== null) { const w = document.querySelector('.mao-wrap'); if (w) w.scrollLeft = rolagemMao; }
+  // deitado e apertado: o aviso não pode ficar por cima do seu avatar
+  const av = document.querySelector('.mesa .aviso'), sv = document.querySelector('.eu-canto');
+  if (av && sv) {
+    const a = av.getBoundingClientRect(), b = sv.getBoundingClientRect(), sobra = a.bottom - (b.top - 20 * ZOOM.valor);
+    if (sobra > 0 && a.right > b.left && a.left < b.right) {
+      if (document.body.classList.contains('paisagem')) av.style.visibility = 'hidden';
+      else av.style.marginBottom = (12 + sobra / ZOOM.valor) + 'px';
+    }
+  }
   ligarMesa();
 }
 
@@ -1145,6 +1170,12 @@ function descrever(acao, r) {
 function agir(acao) {
   const ui = S.ui;
   if (ui.distribuindo && acao.jogador === EU) return;
+  if (acao.jogador === EU && ESPERA_ANIM.has(acao.tipo) && emAnimacao()) {
+    // chegou cedo (relógio, compra automática): faz assim que a animação acabar
+    const e0 = S.e;
+    setTimeout(() => { if (S.e === e0 && S.ui === ui && minhaVez()) agir(acao); }, ui.comboAte - Date.now() + 40);
+    return;
+  }
   if (acao.jogador === EU && acao.tipo === 'jogar' && minhaMao().length - acao.cartas.length === 1 && S.e.disseUltima[EU]) acao.ultima = true;
   // Online: só pede ao servidor; a jogada volta em receberEstado com as animações
   if (S.online) {
@@ -1954,7 +1985,8 @@ function depoisDeMudar() {
   const animando = ui.ultimaCarta !== topo.id && ehPreta(topo.tipo); // espera a animação acabar
   if (atual.bot) {
     ui.prazo = 0;
-    timerBot = setTimeout(() => agir(escolherAcao(S.e, atual.id)), Math.max(animando ? (topo.tipo === 'ctrl' ? 3000 : 2600) : 1900, esperaCombo + 700));
+    const vaiBot = () => { if (emAnimacao()) { timerBot = setTimeout(vaiBot, S.ui.comboAte - Date.now() + 500); return; } agir(escolherAcao(S.e, atual.id)); };
+    timerBot = setTimeout(vaiBot, Math.max(animando ? (topo.tipo === 'ctrl' ? 3000 : 2600) : 1900, esperaCombo + 700));
   } else if (semJogada(e)) {
     // nada para jogar (nem resposta ao +2/+N, nem desafio): compra sozinho
     ui.prazo = 0;

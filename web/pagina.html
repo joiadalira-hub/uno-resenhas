@@ -1,6 +1,8 @@
 <meta charset="utf-8">
 <title>Uno Resenhas</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="dark only">
+<meta name="darkreader-lock">
 
 <style>
 @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(fontes/inter-400.woff) format('woff'); }
@@ -761,6 +763,86 @@ body.apertado:not(.paisagem) .eu-canto .avatar.eu-avatar { width: 50px; height: 
 body.apertado:not(.paisagem) .eu-canto .avatar .inicial { font-size: 22px; border-width: 3px; }
 body.apertado:not(.paisagem) .acoes { gap: 5px; }
 body.apertado:not(.paisagem) .acoes .btn { font-size: 13px; padding: 0 2px; border-radius: 12px; }
+
+/* ===== ajustes de tela: deitado e em pé sem nada sumindo ===== */
+.tela { overflow-x: hidden; }
+.tela-inicio { overflow-x: hidden; }
+.tela-inicio .hero2 { max-width: 100%; }
+/* o nome do jogo cabe sempre na largura (não corta nas laterais) */
+.logo { max-width: 100%; min-width: 0; }
+.logo-titulo { font-size: min(54px, calc(var(--vw, 100vw) * 0.118)) !important; letter-spacing: -.04em; padding-inline: .12em; }
+.logo .coroa::before, .logo .coroa::after { width: min(70px, 14vw); }
+/* painel de configurações */
+.ps-cab { font: 800 18px var(--display); text-align: center; margin-bottom: 2px; }
+.painel-visual { max-height: calc(100dvh - 70px); overscroll-behavior: contain; }
+/* modo noturno desligado: fundo mais claro (as cartas não mudam) */
+body.modo-dia { --chao: #24346E; --superficie: #31448A; --borda: #5068B4; --apagado: #CBD4F5; }
+body.modo-dia .fx-fundo { filter: brightness(1.35) saturate(1.1); }
+body.modo-dia .feltro { filter: brightness(1.25); }
+/* cartões de modo e lugares: nada sai do cartão */
+.modo-op { min-width: 0; overflow: hidden; }
+.modo-op b, .modo-op small { max-width: 100%; overflow-wrap: anywhere; }
+.modo-cores { flex-wrap: wrap; justify-content: center; max-width: 100%; }
+.modo-cores i { width: min(14px, 3vw) !important; height: min(14px, 3vw) !important; flex: none; }
+.lugar { min-width: 0; }
+.lugar > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.lugar b { flex: none; white-space: nowrap; }
+.bloco, .linha, .segmentos, .segmentos > button { min-width: 0; }
+.segmentos > button { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 380px) {
+  .modo-op { padding: 10px 4px !important; }
+  .modo-op b { font-size: 14px !important; }
+  .modo-op small { font-size: 12px !important; }
+  .lugar { padding: 0 6px 0 10px; font-size: 14px; }
+  .lugar b { padding: 4px 7px; font-size: 12px; }
+}
+/* deitado: combo centralizado em cima da mão (não escapa pela esquerda) */
+body.paisagem .painel-combo { left: 50%; right: auto; transform: translateX(-50%); width: min(100%, 640px); bottom: calc(100% + 8px); max-height: 46vh; overflow-y: auto; }
+/* deitado: tela inicial em duas colunas, arte e nome juntos à esquerda, formulário à direita */
+body.paisagem .tela-inicio { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr; align-items: center; column-gap: clamp(16px, 4vw, 48px); padding-inline: max(16px, env(safe-area-inset-left, 0px), calc((var(--vw, 100vw) - 960px) / 2)); }
+body.paisagem .tela-inicio .hero2 { grid-column: 1; grid-row: 1; justify-self: center; width: 100%; margin-top: 18px; transform: none; }
+body.paisagem .tela-inicio .logo { grid-column: 1; grid-row: 2; align-self: start; justify-self: center; margin-top: 16px; }
+body.paisagem .tela-inicio #f-inicio { grid-column: 2; grid-row: 1 / 4; align-self: start; padding-top: 58px; padding-bottom: 8px; min-width: 0; }
+body.paisagem .logo-titulo { font-size: min(50px, calc(var(--vw, 100vw) * 0.058)) !important; }
+body.paisagem .tela-inicio .slogan { font-size: 13px; }
+@media (max-height: 560px) {
+  body.paisagem .tela-inicio .hero2 { transform: none; zoom: .72; margin-bottom: 0; margin-top: 8px; }
+  body.paisagem .tela-inicio .logo { zoom: .9; }
+  body.paisagem .tela-inicio #f-inicio { gap: 8px; padding-top: 54px; }
+  body.paisagem .tela-inicio .escolher-foto { padding: 6px 12px; }
+  body.paisagem .tela-inicio .avatar-grande { width: 48px; height: 48px; }
+}
+@media (max-height: 420px) {
+  body.paisagem .tela-inicio .hero2 { zoom: .58; }
+  body.paisagem .tela-inicio .logo { zoom: .78; }
+}
+
+/* botão de organizar a mão entra na fila das pílulas: nunca fica na frente de outra coisa */
+.pilulas .btn-ordem { position: static; height: 32px; flex: none; }
+body.paisagem .pilulas .btn-ordem { height: 26px; font-size: 12px; padding: 0 10px; }
+.selo-vez { white-space: nowrap; }
+.eu-canto .selo-vez, body.paisagem .eu-canto .selo-vez { left: 0; right: 0; margin-inline: auto; width: max-content; transform: none; }
+/* em pé: a mão vai de uma borda à outra da tela (só a janela corta a carta) */
+body:not(.paisagem) .mao-wrap { width: var(--vw, 100vw); margin-left: calc(50% - var(--vw, 100vw) / 2); margin-right: 0; padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); }
+body:not(.paisagem) .mao { padding-inline: 6px; box-sizing: border-box; }
+.topo-mesa > span:last-child { flex-wrap: nowrap; }
+body:not(.paisagem) .mesa .aviso { margin-bottom: 12px; }
+body.paisagem .mesa .aviso { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.painel-som > * { flex-shrink: 0; }
+.modo-op { container-type: inline-size; }
+.modo-op b { font-size: min(17px, 15cqi) !important; overflow-wrap: normal; word-break: normal; hyphens: none; }
+.modo-op small { font-size: min(14px, 12.5cqi) !important; white-space: nowrap; }
+.modo-cores { flex-wrap: nowrap; }
+.modo-cores i { width: min(14px, 11cqi) !important; height: min(14px, 11cqi) !important; }
+.lista-lugares { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
+.segmentos > button { padding-inline: 4px; font-size: min(15px, 3.7vw); }
+.titulo-tela { font-size: clamp(18px, calc(var(--vw, 100vw) * 0.068), 32px) !important; min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.linha > .btn-icone { flex: none; }
+.segmentos > button { font-size: min(15px, calc(var(--vw, 100vw) * 0.037)); }
+.segmentos { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(min(100%, 76px), 1fr)); }
+.titulo-tela { font-size: clamp(16px, calc(var(--vw, 100vw) * 0.062), 32px) !important; }
+.bloco > .linha { flex-wrap: wrap; row-gap: 6px; }
+.lista-lugares { grid-template-columns: repeat(auto-fill, minmax(min(100%, 165px), 1fr)); }
 </style>
 
 <div id="app"></div>

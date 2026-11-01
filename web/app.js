@@ -885,7 +885,7 @@ function telaMesa() {
       ${ui.combo ? `<button class="btn" id="cancelar">Cancelar</button>
         <button class="btn btn-principal duplo" id="jogar-combo" ${seqValida && seqValida.ok ? '' : 'disabled'}>Jogar ${ui.seq.length || ''} ${ui.seq.length === 1 ? 'carta' : 'cartas'}</button>`
       : `${e.comprou && vez ? '<button class="btn" id="passar">Passar</button>' : `<button class="btn" id="comprar" ${vez ? '' : 'disabled'}>${v.compraPendente && vez ? `Comprar ${v.compraPendente.quantidade}` : 'Comprar'}</button>`}
-        ${v.podeDesafiar ? '<button class="btn btn-perigo" id="desafiar">Desafiar ${nomeMaisN()}</button>' : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
+        ${v.podeDesafiar ? `<button class="btn btn-perigo" id="desafiar">Desafiar ${nomeMaisN()}</button>` : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
         <button class="btn ${mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${mao.length <= 2 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
       </div>
     </div>
@@ -1620,26 +1620,28 @@ function voarDaMao(id, fisicas, antes, palco = null) {
       if (!alvo || !origem) { if (alvo) alvo.classList.add('chegou'); return; }
       const b = alvo.getBoundingClientRect(), w = alvo.offsetWidth, h = alvo.offsetHeight;
       const giro = (parseFloat(alvo.style.getPropertyValue('--r')) || 0) * 0.4;
-      voarCarta(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h, giro }, () => alvo.classList.add('chegou'));
+      voarDaMaoAteAlvo(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h, giro }, () => alvo.classList.add('chegou'));
       return;
     }
     const destino = document.querySelector('.topo-pilha'); // depois do render: o elemento novo
     if (destino && origem) {
       // a pilha é girada e a mesa pode ter zoom: o tamanho que aparece na tela é o offset × zoom
       const b = destino.getBoundingClientRect(), w = destino.offsetWidth * ZOOM.valor, h = destino.offsetHeight * ZOOM.valor;
-      voarCarta(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h, giro: 6 });
+      voarDaMaoAteAlvo(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h, giro: 6 });
     }
   }, k * VOO_PASSO));
   // a última chegou: a pilha mostra a carta nova sem cair de novo (o coringa ainda se pinta)
   setTimeout(() => {
     if (S.ui !== ui) return;
     if (ui.mostrado && ui.mostrado[id] !== undefined && id !== EU) delete ui.mostrado[id];
+    const tinhaSaindo = !!ui.saindo;
     ui.saindo = null;
     if (!palco && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; ui.pousou = true; if (S.tela === 'mesa') render(); ui.pousou = false; }
+    else if (tinhaSaindo && S.tela === 'mesa') render(); // garante a mão certa (ex.: comprou enquanto as cartas voavam)
   }, total);
   return total;
 }
-function voarCarta(c, de, para, aoChegar) {
+function voarDaMaoAteAlvo(c, de, para, aoChegar) {
   const el = document.createElement('div');
   el.className = 'voo-mao';
   el.innerHTML = `<img src="${imgCarta(c)}" alt="">`;

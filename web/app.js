@@ -1858,7 +1858,7 @@ function centroDoJogador(id) {
   return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
 }
 
-let timerBot = null, timerRelogio = null, timerPegou = null;
+let timerBot = null, timerRelogio = null, timerPegou = null, timerVitoria = null;
 function pararTimers() { clearTimeout(timerBot); clearInterval(timerRelogio); clearTimeout(timerPegou); timerBot = timerRelogio = timerPegou = null; }
 
 function depoisDeMudar() {
@@ -1871,9 +1871,11 @@ function depoisDeMudar() {
   if (e.fase !== 'jogando') {
     if (ui.vitoria) return;
     ui.vitoria = true;
-    const ir = () => mostrarVitoria(() => { S.tela = 'fim'; S.ui.modal = null; render(); });
+    const ir = () => { if (S.ui !== ui || S.tela !== 'mesa') return; mostrarVitoria(() => { if (S.ui !== ui) return; S.tela = 'fim'; S.ui.modal = null; render(); }); };
     render();
-    if (esperaCombo) timerBot = setTimeout(ir, esperaCombo + 300); else ir();
+    // timer próprio: outra atualização da mesa (pararTimers) não pode cancelar a tela de vitória
+    clearTimeout(timerVitoria);
+    if (esperaCombo) timerVitoria = setTimeout(ir, esperaCombo + 300); else ir();
     return;
   }
 

@@ -585,7 +585,6 @@ h1, h2 { font-family: var(--display); font-weight: 800; }
 .tela-inicio .btn { min-height: 42px; }
 .tela-inicio .btn-ouro { font-size: 16px; padding: 0 18px; border-radius: 13px; }
 .tela-inicio button[type=submit].btn-grande { min-height: 44px !important; font-size: 16px !important; border-radius: 13px; }
-body:has(.tela-inicio)::before { display: none; }
 
 /* ===== Tela inicial recriada: neons animados, luzes passando, cartas flutuando ===== */
 .tela-inicio > *:not(.fx-fundo) { position: relative; z-index: 1; }
@@ -656,6 +655,91 @@ body:has(.tela-inicio)::before { display: none; }
 .ordens { display: flex; flex-direction: column; gap: 8px; }
 .ordem-op { min-height: 50px; border-radius: 16px; border: 1.5px solid rgba(110,130,240,.55); background: rgba(10,16,44,.75); color: #fff; font: 700 16px var(--corpo); text-align: left; padding: 0 16px; cursor: pointer; }
 .ordem-op[aria-pressed="true"] { border: 2px solid var(--destaque); background: radial-gradient(120% 90% at 50% 70%, rgba(255,190,40,.3), rgba(20,16,10,.7)); box-shadow: 0 0 16px rgba(255,200,40,.45); }
+/* ===== Animações em todas as telas ===== */
+body::before { display: none; } /* os neons agora são o fundo animado (.fx-fundo) */
+body.modo-leve::before { display: block; }
+body.modo-leve .fx-fundo { display: none; }
+body.modo-leve .btn-principal::after { display: none !important; }
+body.modo-leve .tela-inicio .escolher-foto, body.modo-leve .tela-inicio .deck-op, body.modo-leve .tela-inicio .campo, body.modo-leve .tela-inicio .btn { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+/* mesa: fundo mais calmo, o destaque são as jogadas */
+body[data-tela="mesa"] .fx-fundo .varredura, body[data-tela="mesa"] .fx-fundo .o4 { display: none; }
+body[data-tela="mesa"] .fx-fundo .orbe { opacity: .28; }
+body[data-tela="mesa"] .fx-fundo .neon .n-luz { animation-duration: 7.5s; }
+body[data-tela="mesa"] .fx-fundo .neon .n-halo { animation: none; opacity: .18; }
+/* entrada: os blocos da tela sobem um depois do outro (só na primeira vez que a tela aparece) */
+.tela-entra > *:not(.botoes-topo) { animation: sobe-entra .55s cubic-bezier(.2,.9,.3,1.08) both; }
+.tela-entra > *:nth-child(2) { animation-delay: .05s; } .tela-entra > *:nth-child(3) { animation-delay: .1s; }
+.tela-entra > *:nth-child(4) { animation-delay: .15s; } .tela-entra > *:nth-child(5) { animation-delay: .2s; }
+.tela-entra > *:nth-child(6) { animation-delay: .25s; } .tela-entra > *:nth-child(7) { animation-delay: .3s; }
+.tela-entra > *:nth-child(n+8) { animation-delay: .35s; }
+.tela-entra > #f-inicio { animation: none; }
+.tela-entra #f-inicio > * { animation: sobe-entra .55s cubic-bezier(.2,.9,.3,1.08) both; }
+.tela-entra #f-inicio > *:nth-child(2) { animation-delay: .32s; } .tela-entra #f-inicio > *:nth-child(3) { animation-delay: .36s; }
+.tela-entra #f-inicio > *:nth-child(4) { animation-delay: .4s; } .tela-entra #f-inicio > *:nth-child(5) { animation-delay: .44s; }
+.tela-entra #f-inicio > *:nth-child(6) { animation-delay: .48s; } .tela-entra #f-inicio > *:nth-child(n+7) { animation-delay: .52s; }
+.tela-entra #f-inicio > *:first-child { animation-delay: .28s; }
+@keyframes sobe-entra { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
+/* reflexo passando nos botões amarelos das telas */
+.tela .btn-principal { position: relative; overflow: hidden; }
+.tela .btn-principal::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent); transform: skewX(-18deg); animation: reflexo 4.2s ease-in-out infinite 1.4s; pointer-events: none; }
+/* escolhas ativas com brilho respirando */
+.deck-op[aria-pressed="true"], .modo-op[aria-pressed="true"] { animation: brilho-escolha 2.6s ease-in-out infinite; }
+.segmentos button[aria-pressed="true"], .ordem-op[aria-pressed="true"] { animation: brilho-seg 2.6s ease-in-out infinite; }
+@keyframes brilho-escolha { 0%, 100% { box-shadow: 0 0 16px rgba(255,200,40,.4), inset 0 0 14px rgba(255,200,40,.2); } 50% { box-shadow: 0 0 28px rgba(255,200,40,.7), inset 0 0 22px rgba(255,200,40,.32); } }
+@keyframes brilho-seg { 0%, 100% { box-shadow: 0 0 10px rgba(255,200,40,.4), inset 0 2px 0 rgba(255,255,255,.55); } 50% { box-shadow: 0 0 20px rgba(255,200,40,.75), inset 0 2px 0 rgba(255,255,255,.55); } }
+/* interruptor com "pulinho" ao ligar/desligar */
+.chave .trilho::after { transition: transform .32s cubic-bezier(.3,1.7,.5,1); }
+.chave .trilho { transition: background .2s, box-shadow .2s; }
+/* placar: 1º lugar com brilho dourado passando */
+.tabela .lin.eu, .tabela .lin:not(.cab):nth-child(2) { position: relative; overflow: hidden; }
+.tabela .lin.eu::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,230,120,.25) 50%, transparent 70%); background-size: 250% 100%; animation: varre-lin 3.2s ease-in-out infinite; pointer-events: none; }
+@keyframes varre-lin { 0% { background-position: 120% 0; } 60%, 100% { background-position: -40% 0; } }
+@media (prefers-reduced-motion: reduce) { .tela-entra > *, .tela-entra #f-inicio > * { animation: none !important; } .deck-op, .modo-op, .segmentos button, .tabela .lin::after { animation: none !important; } }
+body.modo-leve .deck-op, body.modo-leve .modo-op, body.modo-leve .segmentos button, body.modo-leve .tabela .lin::after { animation: none !important; }
+/* ================= Layout horizontal (celular deitado, tablet, computador) ================= */
+body.paisagem .mesa { display: grid; grid-template-columns: minmax(0, 1fr) clamp(130px, 18vw, 220px); grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 14px; row-gap: 2px; padding-block: 6px; max-width: 1400px; width: 100%; margin-inline: auto; }
+body.paisagem .topo-mesa { grid-column: 1 / -1; grid-row: 1; }
+body.paisagem .arena { grid-column: 1; grid-row: 2; min-height: 0; }
+body.paisagem .mao-zona { grid-column: 1; grid-row: 3; }
+body.paisagem .aviso { grid-column: 2; grid-row: 2; align-self: start; height: auto; white-space: normal; line-height: 1.25; font-size: 13px; margin-top: 4px; }
+body.paisagem .base-mesa { grid-column: 2; grid-row: 2 / 4; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 8px; max-width: none; margin: 0; padding-bottom: 6px; }
+body.paisagem .eu-canto { width: auto; flex-direction: row; justify-content: center; gap: 8px; }
+body.paisagem .eu-canto .avatar.eu-avatar { width: 50px; height: 50px; }
+body.paisagem .eu-canto .avatar .inicial { font-size: 22px; border-width: 3px; }
+body.paisagem .eu-canto .placa { margin-top: 0; font-size: 14px; max-width: 110px; }
+body.paisagem .eu-canto .selo-vez { top: -14px; left: 50%; transform: translateX(-50%); }
+body.paisagem .acoes { flex: none; grid-template-columns: 1fr; gap: 6px; padding-bottom: 0; }
+body.paisagem .acoes .btn { min-height: 44px; font-size: 16px; border-radius: 14px; }
+body.paisagem .acoes .duplo { grid-column: auto; }
+body.paisagem .topo-mesa .btn-icone { width: 40px; height: 38px; min-height: 38px; }
+body.paisagem .relogio { height: 36px; }
+body.paisagem .painel-combo { position: absolute; left: 0; right: 0; bottom: calc(100% + 30px); z-index: 6; }
+@media (max-height: 560px) {
+  body.paisagem .mesa { padding-block: 4px; }
+  body.paisagem .acoes .btn { min-height: 38px; font-size: 15px; }
+  body.paisagem .eu-canto .avatar.eu-avatar { width: 42px; height: 42px; }
+  body.paisagem .pilula { height: 26px; font-size: 12px; padding: 0 10px; }
+  .paisagem .anim-avatar { width: 46px; height: 46px; }
+  .paisagem .anim-avatar .inicial { font-size: 22px; border-width: 3px; }
+  .paisagem .anim-cab .anim-avatar { margin-bottom: 4px; }
+  .paisagem .anim-nome { font-size: 13px; padding: 1px 10px; }
+  .paisagem .anim-titulo { font-size: clamp(34px, 11vh, 60px); -webkit-text-stroke-width: 2px; text-shadow: 0 4px 0 #B8860B, 0 8px 18px rgba(0,0,0,.75); }
+  .paisagem .anim-cab { margin-bottom: 22px; }
+  .paisagem .vit-centro b { font-size: clamp(30px, 10vh, 56px); }
+}
+/* telas de menu: duas colunas */
+body.paisagem .tela { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; row-gap: 14px; align-content: start; align-items: start; padding-inline: max(16px, env(safe-area-inset-left, 0px), calc((var(--vw, 100vw) - 1000px) / 2)); }
+body.paisagem .tela > :first-child, body.paisagem .tela > p.aviso, body.paisagem .tela > #comecar, body.paisagem .tela > .btn-principal:last-child { grid-column: 1 / -1; }
+body.paisagem .tela-inicio { grid-template-rows: auto auto 1fr; align-content: start; }
+body.paisagem .tela-inicio .hero2 { grid-column: 1; grid-row: 1; margin-top: 10px; }
+body.paisagem .tela-inicio .logo { grid-column: 1; grid-row: 2; }
+body.paisagem .tela-inicio #f-inicio { grid-column: 2; grid-row: 1 / 4; align-self: start; padding-top: 52px; }
+body.paisagem .tela-inicio .botoes-topo { grid-column: auto; }
+@media (max-height: 560px) {
+  body.paisagem .tela-inicio .hero2 { height: 150px; transform: scale(.78); transform-origin: 50% 0; margin-bottom: -40px; }
+  body.paisagem .logo-titulo { font-size: 40px !important; }
+  body.paisagem .tela-inicio .logo .risco { width: 190px; }
+}
 </style>
 
 <div id="app"></div>

@@ -123,10 +123,13 @@ function desenharPainelVisual() {
   // o deck vem primeiro: é a escolha que mais se procura aqui dentro da mesa
   pn.innerHTML = `<span class="ps-titulo">Deck das cartas</span>${htmlEscolhaDeck()}<div class="ps-sep"></div>` + AJUSTES.map(([k, , nome, ajuda]) => `<div class="ps-linha"><span style="display:flex;flex-direction:column"><span class="ps-titulo">${nome}</span><span class="ajuda">${ajuda}</span></span>
     <div class="passo"><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="-1" aria-label="Diminuir ${nome}" ${ZOOM[k] <= 0.6 ? 'disabled' : ''}>−</button><span style="min-width:52px;font-size:17px">${Math.round(ZOOM[k] * 100)}%</span><button class="btn btn-icone ps-passo" data-aj="${k}" data-d="1" aria-label="Aumentar ${nome}" ${ZOOM[k] >= 1.6 ? 'disabled' : ''}>+</button></div></div>`).join('')
+    + `<div class="ps-sep"></div><label class="chave" for="ps-leve"><span style="display:flex;flex-direction:column"><span class="ps-titulo">Modo leve</span><span class="ajuda">Desliga os efeitos de luz do fundo (celular mais fraco)</span></span><input type="checkbox" id="ps-leve" ${S.leve ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label>`
     + '<button type="button" class="link" id="aj-padrao" style="align-self:center">Voltar ao padrão</button>';
   ligarEscolhaDeck(pn);
   pn.querySelectorAll('[data-deck]').forEach((b) => b.addEventListener('click', () => setTimeout(desenharPainelVisual, 0)));
   pn.querySelectorAll('[data-aj]').forEach((b) => (b.onclick = () => mudarAjuste(b.dataset.aj, Number(b.dataset.d) * 0.1)));
+  const leve = pn.querySelector('#ps-leve');
+  if (leve) leve.onchange = () => { S.leve = leve.checked; gravar('ur-leve', S.leve); aplicarLeve(); };
   pn.querySelector('#aj-padrao').onclick = () => { for (const [k, chave] of AJUSTES) { ZOOM[k] = 1; gravar(chave, 1); } aplicarZoom(); render(); desenharPainelVisual(); };
 }
 function mudarAjuste(k, d) {
@@ -474,6 +477,21 @@ function buscarSalas() {
 // Redesenhar a mesma tela (voto, regra, bot, lugar…) mantém o ponto onde a pessoa estava:
 // a tela nunca "sobe" sozinha, e as entradas animadas só acontecem na primeira vez.
 let telaDesenhada = null;
+// placar: os números sobem contando até o valor final
+function contarPlacar(raiz) {
+  raiz.querySelectorAll('.tabela .ganho').forEach((el, i) => {
+    const m = el.textContent.trim().match(/^(\+?)(\d+)$/);
+    if (!m || Number(m[2]) === 0) return;
+    const fim = Number(m[2]), pre = m[1], t0 = performance.now() + 250 + i * 70, dur = 700;
+    el.textContent = pre + '0';
+    const passo = (t) => {
+      const k = Math.min(1, Math.max(0, (t - t0) / dur));
+      el.textContent = pre + Math.round(fim * (1 - Math.pow(1 - k, 3)));
+      if (k < 1 && el.isConnected) requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+  });
+}
 function comRolagem(nome, fn) {
   return function (...args) {
     const t = app.querySelector('.tela');
@@ -485,10 +503,45 @@ function comRolagem(nome, fn) {
     S.repetindoTela = false;
     const t2 = app.querySelector('.tela');
     if (t2 && y) t2.scrollTop = y;
+    if (t2 && !repetida) t2.classList.add('tela-entra'); // os painéis sobem um depois do outro
+    if (t2 && !repetida && !S.leve) contarPlacar(t2);
     return r;
   };
 }
+// ---------- fundo animado (neons, cores passando, faixa de luz): um só, atrás de todas as telas ----------
+function montarFundoAnimado() {
+  if (document.querySelector('body > .fx-fundo')) return;
+  const d = document.createElement('div');
+  d.className = 'fx-fundo';
+  d.setAttribute('aria-hidden', 'true');
+  d.innerHTML = `      <span class="orbe o1"></span><span class="orbe o2"></span><span class="orbe o3"></span><span class="orbe o4"></span>
+      <svg width="0" height="0" style="position:absolute"><defs>
+        <linearGradient id="nAzul" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9AD4FF"/><stop offset=".5" stop-color="#1988FF"/><stop offset="1" stop-color="#3B5BFF"/></linearGradient>
+        <linearGradient id="nVerm" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB0C0"/><stop offset=".5" stop-color="#FF3357"/><stop offset="1" stop-color="#C21746"/></linearGradient>
+        <linearGradient id="nRoxo" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0B8FF"/><stop offset=".5" stop-color="#AC4BFF"/><stop offset="1" stop-color="#6B3BFF"/></linearGradient>
+      </defs></svg>
+      ${[['tl', ['M 165 -8 C 95 20, 30 75, -8 175', 'M 120 -8 C 65 18, 22 55, -8 120'], 'nAzul', 0],
+         ['tr', ['M 135 -8 C 205 18, 270 70, 308 160'], 'nVerm', 0.7],
+         ['br', ['M 308 105 C 275 195, 215 265, 120 308', 'M 308 190 C 290 240, 255 280, 205 308'], 'nRoxo', 1.9],
+         ['bl', ['M -8 150 C 40 220, 100 275, 180 308'], 'nAzul', 1.3]]
+        .map(([canto, ds, g, atraso]) => `<svg class="neons ${canto}" viewBox="0 0 300 300">${ds.map((d, k) => `<g class="neon" style="--a:${atraso + k * 0.9}s">
+          <path d="${d}" stroke="url(#${g})" class="n-halo"/>
+          <path d="${d}" stroke="url(#${g})" class="n-corpo${k ? ' fino' : ''}"/>
+          <path d="${d}" class="n-luz" pathLength="100"/></g>`).join('')}</svg>`).join('')}
+      <span class="varredura"></span>
+`;
+  document.body.insertBefore(d, document.body.firstChild);
+}
+// Modo leve: sem os efeitos de fundo (celular fraco ou "reduzir movimento")
+S.leve = ler('ur-leve', window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function aplicarLeve() { document.body.classList.toggle('modo-leve', !!S.leve); }
+// Celular deitado, tablet ou computador (tela mais larga que alta): layout horizontal
+const ehPaisagem = () => { const z = ZOOM.valor, W = window.innerWidth / z, H = window.innerHeight / z; return W > H * 1.15 && W >= 560; };
 function render() {
+  document.body.classList.toggle('paisagem', ehPaisagem());
+  montarFundoAnimado();
+  aplicarLeve();
+  document.body.dataset.tela = S.tela; // a mesa usa um fundo mais calmo
   // a página em si nunca rola (só as telas por dentro): se algo a empurrou, volta ao lugar
   if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0);
   if (S.tela === 'entrar') return telaEntrar();
@@ -504,23 +557,6 @@ function telaInicio() {
   app.innerHTML = `
   <main class="tela tela-inicio" style="position:relative">
     <div class="botoes-topo">${botoesZoom()}${botaoSom()}${botaoTelaCheia()}</div>
-    <div class="fx-fundo" aria-hidden="true">
-      <span class="orbe o1"></span><span class="orbe o2"></span><span class="orbe o3"></span><span class="orbe o4"></span>
-      <svg width="0" height="0" style="position:absolute"><defs>
-        <linearGradient id="nAzul" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9AD4FF"/><stop offset=".5" stop-color="#1988FF"/><stop offset="1" stop-color="#3B5BFF"/></linearGradient>
-        <linearGradient id="nVerm" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB0C0"/><stop offset=".5" stop-color="#FF3357"/><stop offset="1" stop-color="#C21746"/></linearGradient>
-        <linearGradient id="nRoxo" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0B8FF"/><stop offset=".5" stop-color="#AC4BFF"/><stop offset="1" stop-color="#6B3BFF"/></linearGradient>
-      </defs></svg>
-      ${[['tl', ['M 165 -8 C 95 20, 30 75, -8 175', 'M 120 -8 C 65 18, 22 55, -8 120'], 'nAzul', 0],
-         ['tr', ['M 135 -8 C 205 18, 270 70, 308 160'], 'nVerm', 0.7],
-         ['br', ['M 308 105 C 275 195, 215 265, 120 308', 'M 308 190 C 290 240, 255 280, 205 308'], 'nRoxo', 1.9],
-         ['bl', ['M -8 150 C 40 220, 100 275, 180 308'], 'nAzul', 1.3]]
-        .map(([canto, ds, g, atraso]) => `<svg class="neons ${canto}" viewBox="0 0 300 300">${ds.map((d, k) => `<g class="neon" style="--a:${atraso + k * 0.9}s">
-          <path d="${d}" stroke="url(#${g})" class="n-halo"/>
-          <path d="${d}" stroke="url(#${g})" class="n-corpo${k ? ' fino' : ''}"/>
-          <path d="${d}" class="n-luz" pathLength="100"/></g>`).join('')}</svg>`).join('')}
-      <span class="varredura"></span>
-    </div>
     <div class="hero2" aria-hidden="true">
       <svg class="anel-svg tras" viewBox="0 0 360 120"><defs><linearGradient id="gAnel" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF9F11"/><stop offset=".35" stop-color="#FFE27A"/><stop offset=".7" stop-color="#FFC21A"/><stop offset="1" stop-color="#FF9F11"/></linearGradient></defs>
         <g transform="rotate(-7 180 60)"><path class="anel-halo" d="M 15 60 A 165 42 0 0 1 345 60"/><path class="anel-linha" d="M 15 60 A 165 42 0 0 1 345 60"/></g></svg>
@@ -861,9 +897,11 @@ function telaMesa() {
   const comboDisponivel = vez && possiveis.some((p) => p.ids.length > 1);
   // Tamanho das cartas acompanha a tela (celular ou PC)
   const W = window.innerWidth / ZOOM.valor, H = window.innerHeight / ZOOM.valor;
-  const cw = Math.round(Math.max(84, Math.min(W * 0.25, H * 0.16, 150)) * ZOOM.mao);
-  const cwTopo = Math.round(Math.max(96, Math.min(W * 0.27, H * 0.16, 160)) * ZOOM.mesa);
-  const larguraMao = Math.min(W, 1100) - 40;
+  const deitado = ehPaisagem();
+  // deitado: a altura é o que falta, então cartas medidas pela altura e a coluna de botões fica à direita
+  const cw = Math.round((deitado ? Math.max(54, Math.min(H * 0.17, W * 0.1, 120)) : Math.max(84, Math.min(W * 0.25, H * 0.16, 150))) * ZOOM.mao);
+  const cwTopo = Math.round((deitado ? Math.max(56, Math.min(H * 0.165, 130)) : Math.max(96, Math.min(W * 0.27, H * 0.16, 160))) * ZOOM.mesa);
+  const larguraMao = deitado ? Math.min(W, 1400) - Math.max(130, Math.min(W * 0.18, 220)) - 56 : Math.min(W, 1100) - 40;
   const passoCarta = mao.length <= 1 ? cw : Math.max(cw * 0.3, Math.min(cw * 0.86, (larguraMao - cw) / (mao.length - 1)));
   const sobrepor = Math.round(passoCarta - cw);
   // Assentos em volta da mesa oval: da esquerda, por cima, até a direita (ordem de jogo)
@@ -1385,8 +1423,9 @@ function itensDaJogada(jogada) {
 function montarEfeito(area, r, idJog, titulo, sub, itens) {
   const n = itens.length;
   const altura = r.bottom - 12;
-  const fonteTitulo = Math.max(48, Math.min(window.innerWidth * 0.09, 96));
-  const cabecalho = 84 + 34 + fonteTitulo * 0.95 + 24; // mesmo espaço em todas, para as cartas terem sempre o mesmo tamanho
+  const baixa = window.innerHeight < 560; // celular deitado: cabeçalho compacto
+  const fonteTitulo = baixa ? Math.max(34, Math.min(window.innerHeight * 0.11, 60)) : Math.max(48, Math.min(window.innerWidth * 0.09, 96));
+  const cabecalho = (baixa ? 46 + 26 : 84 + 34) + fonteTitulo * 0.95 + 24; // mesmo espaço em todas, para as cartas terem sempre o mesmo tamanho
   const cw = Math.round(Math.max(60, Math.min(r.width * 0.22, (altura - cabecalho - 56) / 1.54, 140)));
   const passo = n > 1 ? Math.min(cw * 0.62, (r.width * 0.9 - cw) / (n - 1)) : 0;
   area.style.setProperty('--cw', cw + 'px');
@@ -2827,7 +2866,13 @@ if (/^https?:$/.test(location.protocol)) {
   else { S.codigoEntrar = codigo; S.tela = 'entrar'; }
 })();
 
-window.addEventListener('resize', () => { aplicarZoom(); if (S.tela === 'mesa') render(); });
+let ultimaPaisagem = null;
+window.addEventListener('resize', () => {
+  aplicarZoom();
+  const p = ehPaisagem();
+  // a mesa sempre se refaz; as outras telas só quando o celular gira (para não perder o que está sendo digitado)
+  if (S.tela === 'mesa' || p !== ultimaPaisagem) { ultimaPaisagem = p; render(); }
+});
 document.addEventListener('keydown', (ev) => { if (ev.key === '9') { const b = document.getElementById('apertar9'); if (b && !b.disabled) b.click(); } });
 telaInicio = comRolagem('inicio', telaInicio);
 telaCriar = comRolagem('criar', telaCriar);

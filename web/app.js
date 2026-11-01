@@ -1,6 +1,7 @@
 // Uno Resenhas — interface (treino contra bots no navegador)
 // Usa o motor (cartas.js, regras.js, bot.js), que é colado antes deste arquivo no build.
 
+const VC = 2; // versão das imagens das cartas: mude quando trocar alguma arte (força baixar de novo)
 let EU = 'eu'; // no online vira o id que o servidor deu para você
 const NOMES_BOTS = ['Ana', 'Rui', 'Bia', 'Léo', 'Duda', 'Caio', 'Mel', 'Nina', 'Tito'];
 const NOME_DA_COR = { vermelho: 'Vermelho', azul: 'Azul', verde: 'Verde', amarelo: 'Amarelo', roxo: 'Roxo', rosa: 'Rosa' };
@@ -363,15 +364,15 @@ function trocarDeck(id) {
   render();
 }
 const htmlEscolhaDeck = () => `<div class="decks" role="group" aria-label="Deck das cartas">${DECKS.map(([id, nome, pasta]) => `<button type="button" class="deck-op" data-deck="${id}" aria-pressed="${S.deck === id}">
-    <span class="deck-mini"><img src="${pasta}/azul-7.webp" alt=""><img src="${pasta}/coringa.webp" alt=""><img src="${pasta}/vermelho-reverso.webp" alt=""></span><b>${nome}</b></button>`).join('')}</div>`;
+    <span class="deck-mini"><img src="${pasta}/azul-7.webp?v=${VC}" alt=""><img src="${pasta}/coringa.webp?v=${VC}" alt=""><img src="${pasta}/vermelho-reverso.webp?v=${VC}" alt=""></span><b>${nome}</b></button>`).join('')}</div>`;
 function ligarEscolhaDeck(raiz = document) {
   raiz.querySelectorAll('[data-deck]').forEach((b) => (b.onclick = () => { if (S.deck !== b.dataset.deck) trocarDeck(b.dataset.deck); }));
 }
 function imgCarta(c) {
-  if (c.tipo === 'coringa' || c.tipo === '+5') return `${PASTA}/${baseCoringa(c)}.webp`;
-  if (c.tipo === 'ctrl') return `${PASTA}/ctrl.webp`;
-  if (c.tipo === 'num') return `${PASTA}/${c.cor}-${c.valor}.webp`;
-  return `${PASTA}/${c.cor}-${{ pular: 'pular', reverso: 'reverso', '+2': 'mais2' }[c.tipo]}.webp`;
+  if (c.tipo === 'coringa' || c.tipo === '+5') return `${PASTA}/${baseCoringa(c)}.webp?v=${VC}`;
+  if (c.tipo === 'ctrl') return `${PASTA}/ctrl.webp?v=${VC}`;
+  if (c.tipo === 'num') return `${PASTA}/${c.cor}-${c.valor}.webp?v=${VC}`;
+  return `${PASTA}/${c.cor}-${{ pular: 'pular', reverso: 'reverso', '+2': 'mais2' }[c.tipo]}.webp?v=${VC}`;
 }
 // Carta do topo com animação: o preto do coringa se pinta com a cor escolhida;
 // o Ctrl+C se pinta e depois vira a carta que ele copiou.
@@ -383,13 +384,13 @@ function htmlTopo(v, nova) {
   const alt = `Topo: ${esc(nomeCarta(fisica))}${fisica.tipo === 'ctrl' ? ' virou ' + esc(nomeCarta(ef)) : ''}`;
   const sq = S.ui && S.ui.pousou ? ' sem-queda' : ''; // chegou voando da mão: não cai de novo
   if (!ehPreta(fisica.tipo)) return `<div class="topo-pilha ${nova ? 'entrou' + sq : ''}" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""></div>`;
-  const final = ehPreta(ef.tipo) ? `${PASTA}/${baseCoringa(ef)}-${cor}.webp` : imgCarta({ tipo: ef.tipo, cor: ef.cor, valor: ef.valor });
+  const final = ehPreta(ef.tipo) ? `${PASTA}/${baseCoringa(ef)}-${cor}.webp?v=${VC}` : imgCarta({ tipo: ef.tipo, cor: ef.cor, valor: ef.valor });
   const selo = fisica.tipo === 'ctrl' ? '<span class="selo-ctrl">Ctrl+C</span>' : '';
   if (!nova) return `<div class="topo-pilha" role="img" aria-label="${alt}"><img src="${final}" alt="">${selo}</div>`;
   if (fisica.tipo !== 'ctrl') {
     return `<div class="topo-pilha entrou${sq}" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""><img class="pinta" src="${final}" alt=""></div>`;
   }
-  return `<div class="topo-pilha entrou${sq}" role="img" aria-label="${alt}"><img class="some-depois" src="${PASTA}/ctrl.webp" alt=""><img class="pinta some-depois" src="${PASTA}/ctrl-${cor}.webp" alt=""><img class="final-vira" src="${final}" alt="">${selo.replace('selo-ctrl', 'selo-ctrl atrasado')}</div>`;
+  return `<div class="topo-pilha entrou${sq}" role="img" aria-label="${alt}"><img class="some-depois" src="${PASTA}/ctrl.webp?v=${VC}" alt=""><img class="pinta some-depois" src="${PASTA}/ctrl-${cor}.webp?v=${VC}" alt=""><img class="final-vira" src="${final}" alt="">${selo.replace('selo-ctrl', 'selo-ctrl atrasado')}</div>`;
 }
 // Todas as cartas baixadas e prontas antes de precisar delas: a carta que outro jogador joga
 // aparece na hora na pilha e nas animações (antes ela só era baixada na primeira vez que aparecia)
@@ -403,7 +404,7 @@ function todasAsCartas() {
     for (const t of ['pular', 'reverso', 'mais2']) l.push(`${c}-${t}`);
     for (const b of [cor, mais, 'ctrl']) l.push(`${b}-${c}`);
   }
-  return l.map((n) => `${PASTA}/${n}.webp`);
+  return l.map((n) => `${PASTA}/${n}.webp?v=${VC}`);
 }
 let deckPronto = '';
 function preCarregarDeck() {
@@ -500,24 +501,13 @@ function render() {
 
 function telaInicio() {
   app.innerHTML = `
-  <main class="tela" style="justify-content:space-between;position:relative">
-    <div style="position:absolute;top:12px;right:0;z-index:2;display:flex;gap:6px">${botoesZoom()}${botaoSom()}${botaoTelaCheia()}</div>
-    <div class="inicio-hero" aria-hidden="true">
-      <span class="anel"></span>
-      <svg class="raios" style="left:calc(50% - 168px);top:34px" width="56" height="60" viewBox="0 0 56 60"><g stroke="#FFD21F" stroke-width="7" stroke-linecap="round"><path d="M10 10l14 18"/><path d="M34 4l4 16"/><path d="M4 40l18 2"/></g></svg>
-      <svg class="raios" style="left:calc(50% + 120px);top:150px" width="56" height="60" viewBox="0 0 56 60"><g stroke="#FFD21F" stroke-width="7" stroke-linecap="round"><path d="M10 34l20-8"/><path d="M14 52l14-14"/><path d="M34 48l4-14"/></g></svg>
-      <img src="${PASTA}/roxo-0.webp" alt="" style="left:calc(50% - 150px);top:48px;transform:rotate(-16deg)">
-      <img src="${PASTA}/ctrl.webp" alt="" style="left:calc(50% - 58px);top:20px;transform:rotate(2deg)">
-      <img src="${PASTA}/mais5.webp" alt="" style="left:calc(50% + 34px);top:52px;transform:rotate(16deg)">
-      <span class="anel frente"></span>
-    </div>
+  <main class="tela tela-inicio" style="position:relative">
+    <div class="botoes-topo">${botoesZoom()}${botaoSom()}${botaoTelaCheia()}</div>
+    <img class="hero-img" src="hero.webp" alt="Uno Resenhas">
     <div class="logo">
-      <span class="coroa" aria-hidden="true"><svg width="38" height="26" viewBox="0 0 38 26"><path d="M3 22L1 6l10 8 8-12 8 12 10-8-2 16z" fill="#FFC61A" stroke="#FF9F11" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
-      <h1>Uno <span class="res">Resenhas</span></h1>
-      <svg class="risco" viewBox="0 0 240 14" aria-hidden="true"><path d="M4 10 C 70 0, 170 0, 236 6 C 170 6, 80 8, 4 10z" fill="#FFC61A"/></svg>
       <p class="slogan">${['', '', '', '', '4 cores, +4, Ctrl+C e muita resenha', '5 cores, +5, Ctrl+C e muita resenha', '6 cores, +6, Ctrl+C e muita resenha'][(S.config && S.config.opcoes && S.config.opcoes.cores) || 5]}</p>
     </div>
-    <form id="f-inicio" style="display:flex;flex-direction:column;gap:12px">
+    <form id="f-inicio">
       <div class="escolher-foto">
         <button type="button" id="foto" class="avatar-grande" aria-label="${S.avatar ? 'Trocar sua foto' : 'Adicionar sua foto'}">${S.avatar ? `<img src="${S.avatar}" alt="">` : `<span>${esc((S.apelido || '?')[0].toUpperCase())}</span>`}</button>
         <span class="divisor" aria-hidden="true"></span>
@@ -1320,8 +1310,8 @@ function itensDaJogada(jogada) {
   const cor = S.e.corAtual;
   return jogada.fisicas.map((c, i) => {
     const ef = jogada.efetivas[i];
-    if (c.tipo === 'coringa' || c.tipo === '+5') return { src: `${PASTA}/${baseCoringa(c)}-${cor}.webp` };
-    if (c.tipo === 'ctrl') return { src: `${PASTA}/ctrl-${ehPreta(ef.tipo) ? cor : ef.cor}.webp`, rotulo: `= ${nomeCarta(ef)}` };
+    if (c.tipo === 'coringa' || c.tipo === '+5') return { src: `${PASTA}/${baseCoringa(c)}-${cor}.webp?v=${VC}` };
+    if (c.tipo === 'ctrl') return { src: `${PASTA}/ctrl-${ehPreta(ef.tipo) ? cor : ef.cor}.webp?v=${VC}`, rotulo: `= ${nomeCarta(ef)}` };
     return { src: imgCarta(c) };
   });
 }
@@ -2147,7 +2137,7 @@ async function desenharArte() {
   });
   const [fotos, enfeites] = await Promise.all([
     Promise.all(lista.map((p) => (p.foto ? carregarImg(p.foto) : null))),
-    Promise.all([`${PASTA}/vermelho-7.webp`, `${PASTA}/azul-reverso.webp`, `${PASTA}/verde-mais2.webp`, `${PASTA}/roxo-0.webp`, `${PASTA}/amarelo-pular.webp`, `${PASTA}/mais5-roxo.webp`].map(carregarImg)),
+    Promise.all([`${PASTA}/vermelho-7.webp?v=${VC}`, `${PASTA}/azul-reverso.webp?v=${VC}`, `${PASTA}/verde-mais2.webp?v=${VC}`, `${PASTA}/roxo-0.webp?v=${VC}`, `${PASTA}/amarelo-pular.webp?v=${VC}`, `${PASTA}/mais5-roxo.webp?v=${VC}`].map(carregarImg)),
   ]);
   // fundo azul-noite com brilho dourado no alto
   const g = c.createLinearGradient(0, 0, 0, H);
@@ -2788,9 +2778,9 @@ aplicarZoom();
 function carregarVerso() {
   document.body.classList.toggle('deck-min', PASTA === 'cartas-min');
   const i = new Image();
-  i.onload = () => { document.body.style.setProperty('--verso-url', `url(${PASTA}/verso.webp)`); document.body.classList.add('tem-verso'); };
+  i.onload = () => { document.body.style.setProperty('--verso-url', `url(${PASTA}/verso.webp?v=${VC})`); document.body.classList.add('tem-verso'); };
   i.onerror = () => document.body.classList.remove('tem-verso');
-  i.src = `${PASTA}/verso.webp`;
+  i.src = `${PASTA}/verso.webp?v=${VC}`;
 }
 carregarVerso();
 render();

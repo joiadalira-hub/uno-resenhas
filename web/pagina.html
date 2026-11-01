@@ -434,13 +434,13 @@ body.tem-verso .voo b { display: none; }
   --painel-borda: linear-gradient(135deg, rgba(64,128,255,.85), rgba(90,80,230,.45) 45%, rgba(176,75,255,.85));
   --amarelo-grad: linear-gradient(180deg, #FFEA70 0%, #FFD21F 55%, #FFB80F 100%);
 }
-body { background: radial-gradient(120% 80% at 50% 38%, #141C4A 0%, #0B1234 45%, #060A1C 100%) fixed; }
+body { background: radial-gradient(120% 80% at 50% 40%, #10184A 0%, #0A1034 45%, #070B26 100%) fixed; }
 /* filetes de neon nas laterais (como nos prints) */
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background:
     radial-gradient(26vw 22vh at 0 0, transparent 93%, rgba(25,136,255,.28) 97%, rgba(120,190,255,.95) 98.6%, rgba(25,136,255,.3) 99.6%, transparent 100%),
     radial-gradient(32vw 24vh at 100% 0, transparent 93%, rgba(255,51,87,.3) 96.5%, rgba(255,120,140,.95) 98.4%, rgba(255,51,87,.3) 99.6%, transparent 100%),
-    radial-gradient(34vw 40vh at 100% 100%, transparent 94%, rgba(172,75,255,.3) 97%, rgba(210,150,255,.95) 98.6%, rgba(172,75,255,.3) 99.6%, transparent 100%),
+    radial-gradient(30vw 28vh at 100% 100%, transparent 94%, rgba(172,75,255,.3) 97%, rgba(210,150,255,.95) 98.6%, rgba(172,75,255,.3) 99.6%, transparent 100%),
     radial-gradient(18vw 16vh at 0 100%, transparent 92%, rgba(25,136,255,.25) 96.5%, rgba(120,190,255,.8) 98.4%, transparent 100%),
     radial-gradient(70vw 40vh at 0 0, rgba(25,136,255,.18), transparent 100%),
     radial-gradient(50vw 32vh at 100% 0, rgba(255,51,87,.14), transparent 100%),
@@ -551,6 +551,46 @@ h1, h2 { font-family: var(--display); font-weight: 800; }
 .voto-lin { background: rgba(10,16,44,.75); border: 1px solid rgba(95,125,240,.3); border-radius: 14px; }
 .fundo-modal { background: rgba(4,7,20,.66); backdrop-filter: blur(3px); }
 .titulo-vitoria { font: 900 italic 34px/1.1 var(--logo) !important; letter-spacing: -1px; background: linear-gradient(180deg, #FFF07A, #FFD21F 50%, #FF9F11); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 0 rgba(120,60,0,.5)); }
+.hero-img { display: block; flex: none; align-self: center; width: min(var(--vw, 100vw), 560px); max-width: none; height: auto; margin: -16px 0 -8px; -webkit-mask-image: linear-gradient(#000 90%, transparent); mask-image: linear-gradient(#000 90%, transparent); }
+@media (min-width: 561px) { .hero-img { -webkit-mask-image: radial-gradient(75% 95% at 50% 40%, #000 70%, transparent); mask-image: radial-gradient(75% 95% at 50% 40%, #000 70%, transparent); } }
+.logo .slogan { margin-top: 0; }
+/* tela inicial compacta, nas proporções do print (tudo cabe numa tela de celular) */
+.tela-inicio { gap: 10px; padding-block: 16px 14px; }
+.tela-inicio .botoes-topo { position: absolute; top: 10px; right: max(16px, calc((var(--vw, 100vw) - 480px) / 2)); z-index: 2; display: flex; gap: 8px; }
+.tela-inicio .botoes-topo .btn-icone { width: 40px; height: 36px; min-height: 36px; border-radius: 11px; }
+.tela-inicio .hero-img { margin: -16px 0 -14px; }
+.tela-inicio .slogan { font-size: 14px; padding: 3px 16px; }
+#f-inicio { display: flex; flex-direction: column; gap: 9px; }
+.tela-inicio .escolher-foto { padding: 10px 16px; gap: 14px; border-radius: 20px; }
+.tela-inicio .avatar-grande { width: 60px; height: 60px; border-width: 2px; }
+.tela-inicio .avatar-grande span { font-size: 24px; }
+.tela-inicio .escolher-foto .titulo-foto { font-size: 17px; }
+.tela-inicio .escolher-foto .divisor { margin: 6px 0; }
+.tela-inicio .rotulo-ico { font-size: 15px; gap: 8px; margin-top: 2px; }
+.tela-inicio .rotulo-ico svg { width: 18px; height: 18px; }
+.tela-inicio .campo { height: 42px; border-radius: 13px; font-size: 16px; }
+.tela-inicio .campo-ico svg { width: 18px; height: 18px; left: 14px; }
+.tela-inicio .campo-ico .campo { padding-left: 42px; }
+.tela-inicio .decks { gap: 10px; }
+.tela-inicio .deck-op { padding: 6px 6px 6px; border-radius: 16px; gap: 2px; }
+.tela-inicio .deck-op b { font-size: 16px; }
+.tela-inicio .deck-mini { width: 112px; height: 66px; }
+.tela-inicio .deck-mini img { width: 44px; border-radius: calc(44px * var(--rk)); }
+.tela-inicio .deck-mini img:nth-child(2) { left: 34px; }
+.tela-inicio .deck-mini img:nth-child(3) { left: 64px; }
+.tela-inicio .deck-op[aria-pressed="true"]::after { width: 20px; height: 20px; font-size: 12px; top: 6px; right: 8px; }
+.tela-inicio .btn-grande.btn-principal { min-height: 50px; font-size: 19px; margin-top: 4px !important; }
+.tela-inicio .btn-grande .setas { right: 18px; font-size: 22px; }
+.tela-inicio .info-linha { font-size: 13px; }
+.tela-inicio .btn { min-height: 42px; }
+.tela-inicio .btn-ouro { font-size: 16px; padding: 0 18px; border-radius: 13px; }
+.tela-inicio button[type=submit].btn-grande { min-height: 44px !important; font-size: 16px !important; border-radius: 13px; }
+/* na tela inicial os neons de cima já estão na arte do topo: ficam só os de baixo */
+body:has(.tela-inicio)::before { background:
+    radial-gradient(30vw 28vh at 100% 100%, transparent 94%, rgba(172,75,255,.3) 97%, rgba(210,150,255,.95) 98.6%, rgba(172,75,255,.3) 99.6%, transparent 100%),
+    radial-gradient(18vw 16vh at 0 100%, transparent 92%, rgba(25,136,255,.25) 96.5%, rgba(120,190,255,.8) 98.4%, transparent 100%),
+    radial-gradient(70vw 40vh at 100% 100%, rgba(172,75,255,.2), transparent 100%),
+    radial-gradient(50vw 30vh at 0 100%, rgba(25,136,255,.14), transparent 100%); }
 </style>
 
 <div id="app"></div>

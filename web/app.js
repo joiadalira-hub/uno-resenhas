@@ -864,7 +864,7 @@ function telaMesa() {
         <button class="btn btn-principal duplo" id="jogar-combo" ${seqValida && seqValida.ok ? '' : 'disabled'}>Jogar ${ui.seq.length || ''} ${ui.seq.length === 1 ? 'carta' : 'cartas'}</button>`
       : `${e.comprou && vez ? '<button class="btn" id="passar">Passar</button>' : `<button class="btn" id="comprar" ${vez ? '' : 'disabled'}>${v.compraPendente && vez ? `Comprar ${v.compraPendente.quantidade}` : 'Comprar'}</button>`}
         ${v.podeDesafiar ? '<button class="btn btn-perigo" id="desafiar">Desafiar +5</button>' : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
-        <button class="btn ${mao.length <= 2 && !e.disseUltima[EU] && vez ? 'btn-alerta' : ''}" id="ultima" ${mao.length <= 2 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
+        <button class="btn ${mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${mao.length <= 2 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
       </div>
     </div>
   </main>
@@ -881,7 +881,7 @@ function telaMesa() {
     S.layoutMesa = { chave: chaveLayout, h, pos };
     arena.style.flex = 'none'; arena.style.height = h + 'px';
   }
-  if (!ui.distribuindo) ui.ultimaCarta = v.cartaDoTopo.id;
+  if (!ui.distribuindo && !ui.topoSegurado) ui.ultimaCarta = v.cartaDoTopo.id; // segurada: a carta ainda vai cair
   ui.treme = null;
   ligarMesa();
 }
@@ -1056,6 +1056,26 @@ function posAcao(acao, r, jogada, antes) {
     const pulados = Array.from({ length: q }, (_, k) => S.e.jogadores[(((jogada.indice + S.e.sentido * (k + 1)) % N) + N) % N].id);
     efeito = { tipo: 'pulo', pulados, destino: S.e.jogadores[S.e.vez].id };
   }
+  // Jogou a penúltima tendo dito "Última!": primeiro o ÚLTIMA!, só depois a carta cai na pilha
+  const troca = (r.eventos || []).find((ev) => ev.tipo === 'troca');
+  const ator1 = S.e.fase === 'jogando' && S.e.jogadores.find((j) => j.id === acao.jogador);
+  const jogouAvisado = !!jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !troca && ator1 && ator1.mao.length === 1 && S.e.vulneravel !== ator1.id;
+  let antesDaCarta = 0;
+  if (jogouAvisado) {
+    const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
+    const marca = (ui.marcaTopo || 0) + 1;
+    ui.marcaTopo = marca;
+    ui.topoSegurado = antes.topo;
+    setTimeout(() => { if (S.ui === ui) mostrarUltima(ator1.id, true); }, atraso);
+    antesDaCarta = atraso + DURACAO_ULTIMA - 250;
+    ui.comboAte = Date.now() + antesDaCarta;
+    if (!(acao.tipo === 'corte' || combo || efeito)) {
+      // carta simples: a pilha troca (com a carta caindo) quando o ÚLTIMA! sai
+      setTimeout(() => { if (S.ui === ui && ui.marcaTopo === marca) { ui.topoSegurado = null; if (S.tela === 'mesa') render(); } }, antesDaCarta);
+      ui.comboAte += 450;
+    }
+  }
+  const depois = (fn) => (antesDaCarta ? setTimeout(() => { if (S.ui === ui && S.e) fn(); }, antesDaCarta) : fn());
   if (acao.tipo === 'corte' && jogada) {
     // CORTOU!: a carta igual cai em cima da do topo, a lâmina passa e a vez é "roubada"
     const N = S.e.jogadores.length, ia = S.e.jogadores.findIndex((j) => j.id === antes.vez), ic = jogada.indice, sent = antes.sentido;
@@ -1067,17 +1087,23 @@ function posAcao(acao, r, jogada, antes) {
     ui.topoSegurado = antes.topo;
     ui.ultimaCarta = S.e.descarte[S.e.descarte.length - 1].id;
     const soltar = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; if (S.tela === 'mesa') render(); } };
-    ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itensDaJogada(jogada)[0], perderam, destino, soltar);
+    const itemCorte = itensDaJogada(jogada)[0];
+    if (antesDaCarta) { ui.comboAte = Date.now() + antesDaCarta + 2400; depois(() => { ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itemCorte, perderam, destino, soltar); }); }
+    else ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itemCorte, perderam, destino, soltar);
   } else if (jogada && (combo || efeito)) {
     const marca = (ui.marcaTopo || 0) + 1;
     ui.marcaTopo = marca;
     ui.topoSegurado = antes.topo; // a pilha continua mostrando a carta de antes
     ui.ultimaCarta = S.e.descarte[S.e.descarte.length - 1].id;
     const soltar = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; if (S.tela === 'mesa') render(); } };
-    ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itensDaJogada(jogada), efeito, soltar);
+    const itens = itensDaJogada(jogada);
+    if (antesDaCarta) {
+      const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
+      ui.comboAte = Date.now() + antesDaCarta + duracoesJogada(itens.length, efeito, q).total;
+      depois(() => { ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar); });
+    } else ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar);
   }
   // Zero que troca as mãos: TROCOU! com os dois jogadores e os leques cruzando a mesa
-  const troca = (r.eventos || []).find((ev) => ev.tipo === 'troca');
   if (troca) {
     const atraso = Math.max(350, (ui.comboAte || 0) - Date.now());
     const de = acao.jogador, com = troca.com;
@@ -1101,11 +1127,9 @@ function posAcao(acao, r, jogada, antes) {
   }
   // Ficou com 1 carta avisando (antes de jogar, ou apertando "Última!" logo depois, antes de alguém pegar): ÚLTIMA!
   // Quem esquece não ganha animação nenhuma: o ESQUECEU! só aparece se alguém de fato pegar ("Pegou!").
-  const ator1 = S.e.fase === 'jogando' && S.e.jogadores.find((j) => j.id === acao.jogador);
   const avisouAgora = acao.tipo === 'ultima' && ator1 && ator1.mao.length === 1;
-  const jogouAvisado = (acao.tipo === 'jogar' || acao.tipo === 'corte') && !troca && ator1 && ator1.mao.length === 1 && S.e.vulneravel !== ator1.id;
-  if (avisouAgora || jogouAvisado) {
-    const atraso = avisouAgora ? Math.max(0, (ui.comboAte || 0) - Date.now()) : Math.max(350, (ui.comboAte || 0) - Date.now());
+  if (avisouAgora) {
+    const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
     setTimeout(() => { if (S.e) mostrarUltima(ator1.id, true); }, atraso);
     ui.comboAte = Date.now() + atraso + DURACAO_ULTIMA;
   }

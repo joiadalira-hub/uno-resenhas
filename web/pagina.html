@@ -225,14 +225,14 @@ body.tem-verso .monte b { display: none; }
 /* +N de compra por efeito */
 .compra-show .anim-titulo { color: #fff; -webkit-text-stroke: 3px #3A0805; text-shadow: 0 7px 0 var(--perigo), 0 14px 30px rgba(0,0,0,.75); font-size: clamp(64px, 14vw, 130px); }
 /* cabeçalho: foto/avatar, nome e título */
-.anim-cab { position: relative; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.anim-cab { position: relative; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; margin-bottom: 30px; } /* espaço fixo para a legenda: as cartas não pulam quando ela aparece */
 .anim-avatar { width: 84px; height: 84px; animation: vit-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
 .anim-avatar .inicial { font-size: 40px; border-width: 5px; }
 .anim-avatar .figurinha { width: 112%; height: 112%; object-position: center bottom; }
 .anim-cab .anim-avatar { margin-bottom: 12px; }
 .anim-nome { margin-top: 4px; padding: 3px 14px; border-radius: 999px; background: var(--cor-jog); color: #10162B; font: 800 17px var(--corpo); animation: surge .3s .15s both; }
 .anim-titulo { font: 800 clamp(48px, 9vw, 96px) / .95 var(--display); white-space: nowrap; color: var(--destaque); letter-spacing: 3px; -webkit-text-stroke: 3px #3A2A00; text-shadow: 0 7px 0 #B8860B, 0 14px 30px rgba(0,0,0,.75); animation: pop .55s .1s cubic-bezier(.2,1.7,.4,1) both; }
-.anim-sub { position: relative; z-index: 6; margin-top: 4px; padding: 3px 12px; border-radius: 999px; background: rgba(8,12,26,.9); font: 800 16px var(--corpo); color: #fff; }
+.anim-sub { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap; z-index: 6; margin-top: 4px; padding: 3px 12px; border-radius: 999px; background: rgba(8,12,26,.9); font: 800 16px var(--corpo); color: #fff; }
 @keyframes surge { from { opacity: 0; } }
 .combo-titulo { position: absolute; top: calc(66% - var(--cw) * 0.77 - 8px); transform: translateY(-100%); left: 0; right: 0; display: flex; justify-content: center; }
 .combo-titulo b { font: 800 clamp(64px, 14vw, 140px) / .9 var(--display); color: var(--destaque); letter-spacing: 3px; -webkit-text-stroke: 3px #3A2A00; text-shadow: 0 7px 0 #B8860B, 0 14px 30px rgba(0,0,0,.75); }

@@ -433,6 +433,9 @@ function nomeCarta(c) {
 const nomeJog = (id) => (id === EU ? 'Você' : S.e.jogadores.find((j) => j.id === id)?.nome ?? '?');
 const minhaMao = () => S.e.jogadores.find((j) => j.id === EU).mao;
 const minhaVez = () => S.e.fase === 'jogando' && S.e.jogadores[S.e.vez].id === EU;
+// Na minha vez sem nada para jogar (o jogo compra sozinho). Com carta que serve, comprar continua sendo escolha minha.
+const semJogada = (e) => !e.regra9 && !e.comprou && !(e.compraPendente && e.ultimoMais5) && jogadasPossiveis(e, EU).length === 0;
+const avisoSemJogada = (e) => (e.compraPendente ? `Sem resposta para o ${e.compraPendente.tipo === '+5' ? nomeMaisN() : e.compraPendente.tipo}: comprando ${e.compraPendente.quantidade}…` : 'Nenhuma carta serve: comprando uma…');
 
 // ---------- salas para entrar (tela inicial) ----------
 S.salas = null;
@@ -1641,9 +1644,19 @@ function voarDaMao(id, fisicas, antes, palco = null) {
       // base da ação: a carta k do palco (ainda escondida) aparece quando a voadora chega
       const alvo = palco.querySelectorAll('.combo-carta')[k];
       if (!alvo || !origem) { if (alvo) alvo.classList.add('chegou'); return; }
-      const b = alvo.getBoundingClientRect(), w = alvo.offsetWidth, h = alvo.offsetHeight;
+      // a própria carta do palco sai da mão até o lugar dela: não troca de elemento no meio do caminho (sem pulo)
       const giro = (parseFloat(alvo.style.getPropertyValue('--r')) || 0) * 0.4;
-      voarDaMaoAteAlvo(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h, giro }, () => alvo.classList.add('chegou'));
+      alvo.style.transform = `rotate(${giro}deg)`; // posição final fixa durante o voo
+      const b = alvo.getBoundingClientRect();
+      const dx = origem.left + origem.width / 2 - (b.left + b.width / 2), dy = origem.top + origem.height / 2 - (b.top + b.height / 2);
+      const s0 = origem.width / alvo.offsetWidth;
+      alvo.classList.add('chegou');
+      const a = alvo.animate([
+        { transform: `translate(${dx}px, ${dy}px) scale(${s0})` },
+        { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 18}px) scale(${(s0 + 1) / 2}) rotate(${giro / 2}deg)`, offset: 0.55 },
+        { transform: `rotate(${giro}deg)` },
+      ], { duration: VOO_DUR, easing: 'cubic-bezier(.3,.6,.4,1)' });
+      a.onfinish = () => { alvo.style.transform = ''; }; // devolve ao CSS (espalha/recolhe seguem dali)
       return;
     }
     const destino = document.querySelector('.topo-pilha'); // depois do render: o elemento novo
@@ -1782,11 +1795,11 @@ function depoisDeMudar() {
   if (atual.bot) {
     ui.prazo = 0;
     timerBot = setTimeout(() => agir(escolherAcao(S.e, atual.id)), Math.max(animando ? (topo.tipo === 'ctrl' ? 3000 : 2600) : 1900, esperaCombo + 700));
-  } else if (e.compraPendente && !e.ultimoMais5 && jogadasPossiveis(e, EU).length === 0) {
-    // levou +2/+5 sem ter como responder nem desafiar: compra sozinho (não há o que decidir)
+  } else if (semJogada(e)) {
+    // nada para jogar (nem resposta ao +2/+N, nem desafio): compra sozinho
     ui.prazo = 0;
-    ui.aviso = `Sem resposta para o ${e.compraPendente.tipo}: comprando ${e.compraPendente.quantidade}…`; ui.erro = false;
-    timerBot = setTimeout(() => { if (S.e === e && minhaVez() && S.e.compraPendente) agir({ tipo: 'comprar', jogador: EU }); }, Math.max(1100, esperaCombo + 900));
+    ui.aviso = avisoSemJogada(e); ui.erro = false;
+    timerBot = setTimeout(() => { if (S.e === e && minhaVez() && semJogada(S.e)) agir({ tipo: 'comprar', jogador: EU }); }, Math.max(e.compraPendente ? 1100 : 900, esperaCombo + 900));
   } else {
     if (ui.vezAnterior !== EU) tocarDepois('sua-vez', Math.max(0, esperaCombo - 200));
     const tempo = S.config.tempo;
@@ -1813,8 +1826,8 @@ function depoisDeMudarOnline(esperaCombo) {
   const atual = e.jogadores[e.vez];
   const vezAntes = ui.vezAnterior;
   ui.prazo = 0;
-  if (!e.regra9 && atual.id === EU && e.compraPendente && !e.ultimoMais5 && jogadasPossiveis(e, EU).length === 0) {
-    ui.aviso = `Sem resposta para o ${e.compraPendente.tipo}: comprando ${e.compraPendente.quantidade}…`; ui.erro = false; // o servidor compra sozinho
+  if (atual.id === EU && semJogada(e)) {
+    ui.aviso = avisoSemJogada(e); ui.erro = false; // o servidor compra sozinho
   } else if (!e.regra9 && atual.id === EU) {
     if (vezAntes !== EU) tocarDepois('sua-vez', Math.max(0, esperaCombo - 200));
     if (ui.prazoServidor) {

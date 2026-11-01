@@ -332,7 +332,7 @@ class Sala {
     if (atual.bot) {
       this.depois(Math.max(1900, espera + 700), () => { const a = escolherAcao(this.e, atual.id); this.agir(a, atual.id); });
     } else if (semSaida(e, atual.id)) {
-      // levou +2/+5 e não tem nada para responder nem para desafiar: compra sozinho
+      // nada para jogar (sem resposta ao +2/+N e sem desafio, ou vez normal sem carta que sirva): compra sozinho
       this.depois(espera + 900, () => { if (this.e.jogadores[this.e.vez].id === atual.id && semSaida(this.e, atual.id)) this.agir({ tipo: 'comprar', jogador: atual.id }, 'automatico'); });
     } else if (this.config.tempo) {
       const ms = espera + this.config.tempo * 1000;
@@ -395,8 +395,11 @@ class Sala {
 }
 
 // Compra acumulada sem nenhuma carta para responder e sem +5 para desafiar: não há o que decidir
+// Sem nada para jogar na vez: compra sozinho (levou +2/+N sem resposta e sem desafio, ou a vez normal sem carta que sirva)
 function semSaida(e, id) {
-  return !!(e.compraPendente && !e.regra9 && !e.ultimoMais5 && jogadasPossiveis(e, id).length === 0);
+  if (e.regra9 || e.comprou) return false;
+  if (e.compraPendente && e.ultimoMais5) return false; // dá para desafiar: a pessoa decide
+  return jogadasPossiveis(e, id).length === 0;
 }
 
 // O que cada jogador pode saber de um evento: as cartas compradas pelos outros não vão para ele

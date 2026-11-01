@@ -1070,9 +1070,6 @@ function posAcao(acao, r, jogada, antes) {
   const sentidoAntes = antes.sentido, maosAntes = antes.maos, minhasAntes = antes.minhas;
   ui.aviso = descrever(acao, r); ui.erro = false;
   somDaAcao(acao, r, jogada, combo, antes);
-  // Antes de tudo: as cartas saem da mão de quem jogou, viradas para cima, e vão até o monte
-  const voo = jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') ? voarDaMao(acao.jogador, jogada.fisicas, antes) : 0;
-  if (voo) ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + voo);
   // Combo, Pular e Reverso: uma animação só; as cartas só vão para a pilha no fim dela
   let efeito = null;
   if (jogada && S.e.sentido !== sentidoAntes) efeito = { tipo: 'reverso', sentido: S.e.sentido };
@@ -1085,7 +1082,12 @@ function posAcao(acao, r, jogada, antes) {
   const troca = (r.eventos || []).find((ev) => ev.tipo === 'troca');
   const ator1 = S.e.fase === 'jogando' && S.e.jogadores.find((j) => j.id === acao.jogador);
   const jogouAvisado = !!jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !troca && ator1 && ator1.mao.length === 1 && S.e.vulneravel !== ator1.id;
-  let antesDaCarta = voo; // combo, Pular, Reverso e corte começam quando as cartas chegam
+  // Antes de tudo: as cartas saem da mão de quem jogou, viradas para cima.
+  // Ação (combo, Pular, Reverso) vai direto para a base da ação no palco; o resto vai para o monte.
+  const vaiAoPalco = !!jogada && acao.tipo === 'jogar' && !!(combo || efeito) && !jogouAvisado && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const voo = jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !vaiAoPalco ? voarDaMao(acao.jogador, jogada.fisicas, antes) : 0;
+  if (voo) ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + voo);
+  let antesDaCarta = voo; // corte e ÚLTIMA começam quando as cartas chegam
   if (jogouAvisado) {
     const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
     const marca = (ui.marcaTopo || 0) + 1;
@@ -1126,6 +1128,11 @@ function posAcao(acao, r, jogada, antes) {
       const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
       ui.comboAte = Date.now() + antesDaCarta + duracoesJogada(itens.length, efeito, q).total;
       depois(() => { ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar); });
+    } else if (vaiAoPalco) {
+      const fim = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar, true);
+      if (comboAtivo) voarDaMao(acao.jogador, jogada.fisicas, antes, comboAtivo);
+      ui.marcaTopo = marca; ui.topoSegurado = antes.topo; // quem solta a pilha é o fim do palco
+      ui.comboAte = fim;
     } else ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar);
   }
   // Zero que troca as mãos: TROCOU! com os dois jogadores e os leques cruzando a mesa
@@ -1293,7 +1300,7 @@ const SETAS_REVERSO = `<div class="reverso-setas"><svg viewBox="0 0 100 100" ari
       <defs><marker id="ponta-rev" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
       <path d="M50 8 A42 42 0 0 1 92 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/>
       <path d="M50 92 A42 42 0 0 1 8 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/></svg></div>`;
-function mostrarJogada(idJog, itens, efeito, aoPousar) {
+function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false) {
   if (comboAtivo) comboAtivo.remove();
   const n = itens.length, combo = n > 1;
   const nomeEf = efeito ? (efeito.tipo === 'reverso' ? 'REVERSO!' : 'PULOU!') : '';
@@ -1302,6 +1309,7 @@ function mostrarJogada(idJog, itens, efeito, aoPousar) {
   if (!p) { aoPousar(); return 0; }
   const { palco, area, r } = p;
   montarEfeito(area, r, idJog, combo ? 'COMBO!' : nomeEf, combo ? '' : subEf, itens);
+  if (daMao) palco.classList.add('da-mao'); // as cartas chegam voando da mão, não caem do alto
   comboAtivo = palco;
   const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (combo) tocar('combo');
@@ -1311,7 +1319,7 @@ function mostrarJogada(idJog, itens, efeito, aoPousar) {
     setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, 2150);
     return 2150;
   }
-  if (combo) itens.forEach((_, i) => tocarDepois('carta', 450 + i * 225)); // cada carta que cai faz o som
+  if (combo && !daMao) itens.forEach((_, i) => tocarDepois('carta', 450 + i * 225)); // cada carta que cai faz o som
   const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
   const d = duracoesJogada(n, efeito, q);
   setTimeout(() => palco.classList.add('espalha'), d.tEspalha);
@@ -1583,14 +1591,13 @@ function mostrarTroca(a, b) {
 // ---------- cartas saindo da mão de quem jogou até o monte ----------
 const VOO_PASSO = 90, VOO_DUR = 320;
 const duracaoVooMao = (n) => (n - 1) * VOO_PASSO + VOO_DUR;
-function voarDaMao(id, fisicas, antes) {
+function voarDaMao(id, fisicas, antes, palco = null) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0;
   const ui = S.ui, n = fisicas.length, total = duracaoVooMao(n);
   if (!document.querySelector('.topo-pilha')) return 0;
   // a pilha segura a carta de antes até a última chegar
   const marca = (ui.marcaTopo || 0) + 1;
-  ui.marcaTopo = marca;
-  ui.topoSegurado = antes.topo;
+  if (!palco) { ui.marcaTopo = marca; ui.topoSegurado = antes.topo; }
   const ids = fisicas.map((c) => c.id);
   if (id === EU) { ui.saindo = new Set(ids); ui.maoAntes = antes.minhasCartas; }
   else { ui.mostrado = ui.mostrado || {}; ui.mostrado[id] = antes.maos[id]; }
@@ -1607,10 +1614,20 @@ function voarDaMao(id, fisicas, antes) {
       if (el) { const b = el.getBoundingClientRect(); const w = Math.max(26, b.height * 0.62); origem = { left: b.left + b.width / 2 - w / 2, top: b.top, width: w, height: w * 1.54 }; }
       saiuCarta(id, antes.maos[id] - k - 1);
     }
+    if (palco) {
+      // base da ação: a carta k do palco (ainda escondida) aparece quando a voadora chega
+      const alvo = palco.querySelectorAll('.combo-carta')[k];
+      if (!alvo || !origem) { if (alvo) alvo.classList.add('chegou'); return; }
+      const b = alvo.getBoundingClientRect(), w = alvo.offsetWidth, h = alvo.offsetHeight;
+      const giro = (parseFloat(alvo.style.getPropertyValue('--r')) || 0) * 0.4;
+      voarCarta(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h, giro }, () => alvo.classList.add('chegou'));
+      return;
+    }
     const destino = document.querySelector('.topo-pilha'); // depois do render: o elemento novo
     if (destino && origem) {
-      const b = destino.getBoundingClientRect(), w = destino.offsetWidth, h = destino.offsetHeight; // a pilha é girada: o tamanho real vem do offset
-      voarCarta(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h });
+      // a pilha é girada e a mesa pode ter zoom: o tamanho que aparece na tela é o offset × zoom
+      const b = destino.getBoundingClientRect(), w = destino.offsetWidth * ZOOM.valor, h = destino.offsetHeight * ZOOM.valor;
+      voarCarta(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h, giro: 6 });
     }
   }, k * VOO_PASSO));
   // a última chegou: a pilha mostra a carta nova sem cair de novo (o coringa ainda se pinta)
@@ -1618,11 +1635,11 @@ function voarDaMao(id, fisicas, antes) {
     if (S.ui !== ui) return;
     if (ui.mostrado && ui.mostrado[id] !== undefined && id !== EU) delete ui.mostrado[id];
     ui.saindo = null;
-    if (ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; ui.pousou = true; if (S.tela === 'mesa') render(); ui.pousou = false; }
+    if (!palco && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; ui.pousou = true; if (S.tela === 'mesa') render(); ui.pousou = false; }
   }, total);
   return total;
 }
-function voarCarta(c, de, para) {
+function voarCarta(c, de, para, aoChegar) {
   const el = document.createElement('div');
   el.className = 'voo-mao';
   el.innerHTML = `<img src="${imgCarta(c)}" alt="">`;
@@ -1634,9 +1651,9 @@ function voarCarta(c, de, para) {
   const a = el.animate([
     { transform: `translate(${dx}px, ${dy}px) scale(${de.width / para.width})`, opacity: 1 },
     { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 18}px) scale(${(de.width / para.width + 1) / 2}) rotate(${giro}deg)`, offset: 0.55 },
-    { transform: 'rotate(6deg)', opacity: 1 },
+    { transform: `rotate(${para.giro || 0}deg)`, opacity: 1 },
   ], { duration: VOO_DUR, easing: 'cubic-bezier(.3,.6,.4,1)' });
-  a.onfinish = () => el.remove();
+  a.onfinish = () => { if (aoChegar) aoChegar(); el.remove(); };
   setTimeout(() => el.remove(), VOO_DUR + 400);
 }
 // a mão do adversário perde uma carta (o leque se reacomoda)

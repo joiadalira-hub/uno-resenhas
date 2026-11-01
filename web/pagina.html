@@ -145,7 +145,7 @@ body.tem-verso .monte b { display: none; }
 .topo-pilha img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: calc(var(--cw-topo) * var(--rk)); display: block; }
 .topo-pilha.entrou { animation: entra .28s ease-out; }
 .topo-pilha.entrou.sem-queda { animation: none; }
-.voo-mao { position: fixed; z-index: 14; pointer-events: none; will-change: transform; }
+.voo-mao { position: fixed; z-index: 16; pointer-events: none; will-change: transform; }
 .voo-mao img { width: 100%; height: 100%; display: block; border-radius: calc(var(--rk, .065) * var(--w, 100%)); box-shadow: 0 8px 18px rgba(0,0,0,.45); }
 @keyframes entra { from { transform: rotate(-10deg) scale(1.25); opacity: .3; } to { transform: rotate(6deg) scale(1); opacity: 1; } }
 /* coringa: o preto se pinta de dentro para fora com a cor escolhida */
@@ -209,6 +209,8 @@ body.tem-verso .monte b { display: none; }
 /* combo: no fim as cartas voltam uma a uma para a pilha e o escuro sai junto */
 .palco.recolhe .palco-fundo, .palco.recolhe .anim-cab { opacity: 0; transition: opacity .3s; }
 .palco.recolhe .combo-carta { transition: none; }
+.palco.da-mao .combo-carta { animation: none; visibility: hidden; }
+.palco.da-mao .combo-carta.chegou { visibility: visible; }
 .palco.recolhe .reverso-setas { opacity: 0; transition: opacity .3s; }
 /* CORTOU! */
 .corte-show .anim-titulo { color: #FFB199; -webkit-text-stroke: 3px #3A0805; text-shadow: 0 7px 0 #E8452C, 0 14px 30px rgba(0,0,0,.75); }

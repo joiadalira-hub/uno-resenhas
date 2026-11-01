@@ -316,3 +316,19 @@ test('modos de cores: Tradicional (4) e Resenhas estendido (6)', () => {
   const total = p6.monte.length + p6.descarte.length + p6.jogadores.reduce((s, j) => s + j.mao.length, 0);
   assert.equal(total, 165);
 });
+
+test('depois de comprar dá para jogar qualquer carta da mão', () => {
+  const boa = N('azul', 2), outra = N('verde', 9);
+  const e = mesa({ maos: [[boa, outra], extras()], topo: N('azul', 7) });
+  e.monte = [N('roxo', 3)]; // a comprada não serve
+  const r = aplicar(e, { tipo: 'comprar', jogador: 'j1' });
+  assert.equal(e.vez, 0, 'continua a vez: ainda tem carta que serve');
+  assert.ok(r.podeJogar);
+  aplicar(e, { tipo: 'jogar', jogador: 'j1', cartas: [boa.id] });
+  assert.equal(e.topo.valor, 2);
+  // sem nenhuma carta que sirva depois de comprar: a vez passa
+  const e2 = mesa({ maos: [[N('verde', 9), N('roxo', 1)], extras()], topo: N('azul', 7) });
+  e2.monte = [N('roxo', 3)];
+  aplicar(e2, { tipo: 'comprar', jogador: 'j1' });
+  assert.equal(e2.vez, 1);
+});

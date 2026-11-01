@@ -1190,7 +1190,7 @@ function posAcao(acao, r, jogada, antes) {
     setTimeout(() => { if (S.e) mostrarUltima(ator1.id, true); }, atraso);
     ui.comboAte = Date.now() + atraso + DURACAO_ULTIMA;
   }
-  if (acao.jogador === EU && acao.tipo === 'comprar' && r.podeJogar) ui.aviso = 'Você comprou uma carta que serve: jogue-a ou passe';
+  if (acao.jogador === EU && acao.tipo === 'comprar' && r.podeJogar) ui.aviso = r.serve ? 'A carta comprada serve: jogue qualquer carta ou passe' : 'Comprou: jogue qualquer carta que sirva ou passe';
   // compras: uma carta por vez saindo do monte até quem comprou
   const compras = [];
   if (['comprar', 'pegou', 'desafiar', 'apertar9', 'tempo9'].includes(acao.tipo)) {

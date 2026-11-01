@@ -72,7 +72,7 @@ export function iniciarRodada(e) {
   e.sentido = 1;
   e.compraPendente = null;  // { tipo:'+2'|'+5', quantidade }
   e.ultimoMais5 = null;     // para o desafio do +5
-  e.comprou = null;         // id da carta comprada nesta vez
+  e.comprou = null;         // id da carta comprada nesta vez (marca que já comprou; dá para jogar qualquer carta ou passar)
   e.vulneravel = null;      // jogador com 1 carta que não apertou "Última!"
   e.disseUltima = {};
   e.reembaralhadas = 0;
@@ -162,7 +162,6 @@ function checarJogada(e, idJogador, idsCartas, { foraDaVez }) {
     if (!c) throw new ErroJogada('nao_tem', 'Essa carta não está na sua mão');
     return c;
   });
-  if (e.comprou && !idsCartas.includes(e.comprou)) throw new ErroJogada('comprada', 'Depois de comprar, só dá para jogar a carta comprada');
 
   const efetivas = resolverSequencia(e, cartas);
   const f0 = face(efetivas[0]);
@@ -393,10 +392,12 @@ function comprar(e, acao) {
     }
   }
   if (checarMorteSubita(e)) return { compradas: novas };
+  // depois de comprar, pode jogar QUALQUER carta da mão que sirva (ou passar);
+  // se nenhuma servir, a vez passa sozinha
   const ultimaComprada = novas[novas.length - 1];
-  if (ultimaComprada && validarJogada(e, j.id, [ultimaComprada.id]).ok) {
-    e.comprou = ultimaComprada.id; // pode jogar ou passar
-    return { compradas: novas, podeJogar: ultimaComprada.id };
+  if (ultimaComprada && j.mao.some((c) => validarJogada(e, j.id, [c.id]).ok)) {
+    e.comprou = ultimaComprada.id; // marca que já comprou nesta vez
+    return { compradas: novas, podeJogar: true, serve: validarJogada(e, j.id, [ultimaComprada.id]).ok };
   }
   e.comprou = null;
   e.vez = passo(e, ij, 1);

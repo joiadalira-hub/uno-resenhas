@@ -88,6 +88,7 @@ const ZOOM = { valor: ler('ur-zoom', 1), mao: ler('ur-tam-mao', 1), mesa: ler('u
 function aplicarZoom() {
   const z = ZOOM.valor;
   app.style.zoom = z === 1 ? '' : String(z);
+  app.style.setProperty('--vw', `${window.innerWidth / z}px`); // largura da tela em px do zoom (as telas vão de borda a borda)
   // altura em px (que o zoom multiplica): a tela inteira continua cabendo, em qualquer navegador
   app.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
 }

@@ -1416,6 +1416,7 @@ function voarCarta(id, duracao, i, aoChegar) {
   el.className = 'voo verso';
   el.innerHTML = '<b>UR</b>';
   Object.assign(el.style, { left: a.left + 'px', top: a.top + 'px', width: a.width + 'px', height: a.height + 'px' });
+  el.style.setProperty('--vw', a.width + 'px'); // mesmo arredondamento das outras cartas
   document.body.appendChild(el);
   const dx = b.left + b.width / 2 - (a.left + a.width / 2);
   const dy = (id === EU ? b.top + b.height * 0.55 : b.top + b.height / 2) - (a.top + a.height / 2);

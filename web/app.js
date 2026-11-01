@@ -1094,6 +1094,7 @@ function posAcao(acao, r, jogada, antes) {
   const voo = jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !vaiAoPalco && !ultimaComCartas ? voarDaMao(acao.jogador, jogada.fisicas, antes) : 0;
   if (voo) ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + voo);
   let antesDaCarta = voo; // corte e ÚLTIMA começam quando as cartas chegam
+  let ultimaNoPalco = false;
   if (ultimaComCartas) {
     // ÚLTIMA! com as cartas jogadas no meio (como um combo); carta simples vai dali para o monte,
     // combo / Pular / Reverso / corte seguem com a animação deles logo depois
@@ -1102,6 +1103,11 @@ function posAcao(acao, r, jogada, antes) {
     ui.marcaTopo = marca;
     ui.topoSegurado = antes.topo;
     const simples = !(acao.tipo === 'corte' || combo || efeito);
+    if (!simples) {
+      // combo / Pular / Reverso / corte: ÚLTIMA! e a jogada no MESMO palco (montado lá embaixo), sem trocar as cartas
+      ultimaNoPalco = true;
+      antesDaCarta = atraso;
+    } else {
     const durU = DURACAO_ULTIMA + duracaoVooMao(jogada.fisicas.length) + (simples ? 350 : 0);
     const soltarU = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; ui.pousou = true; if (S.tela === 'mesa') render(); ui.pousou = false; } };
     const itensU = itensDaJogada(jogada);
@@ -1111,8 +1117,9 @@ function posAcao(acao, r, jogada, antes) {
       if (palco) voarDaMao(acao.jogador, jogada.fisicas, antes, palco); else if (simples) soltarU();
     };
     if (atraso) setTimeout(comecar, atraso); else comecar();
-    antesDaCarta = atraso + durU - (simples ? 0 : 250);
+    antesDaCarta = atraso + durU;
     ui.comboAte = Date.now() + antesDaCarta;
+    }
   } else if (jogouAvisado) {
     const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
     const marca = (ui.marcaTopo || 0) + 1;
@@ -1140,7 +1147,14 @@ function posAcao(acao, r, jogada, antes) {
     ui.ultimaCarta = S.e.descarte[S.e.descarte.length - 1].id;
     const soltar = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; if (S.tela === 'mesa') render(); } };
     const itemCorte = itensDaJogada(jogada)[0];
-    if (antesDaCarta) { ui.comboAte = Date.now() + antesDaCarta + 2400; depois(() => { ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itemCorte, perderam, destino, soltar); }); }
+    if (ultimaNoPalco) {
+      ui.comboAte = Date.now() + antesDaCarta + 4000;
+      depois(() => {
+        ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itemCorte, perderam, destino, soltar, true);
+        if (comboAtivo) voarDaMao(acao.jogador, jogada.fisicas, antes, comboAtivo);
+        ui.marcaTopo = marca; ui.topoSegurado = antes.topo;
+      });
+    } else if (antesDaCarta) { ui.comboAte = Date.now() + antesDaCarta + 2400; depois(() => { ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itemCorte, perderam, destino, soltar); }); }
     else ui.comboAte = Date.now() + mostrarCorte(acao.jogador, itemCorte, perderam, destino, soltar);
   } else if (jogada && (combo || efeito)) {
     const marca = (ui.marcaTopo || 0) + 1;
@@ -1149,10 +1163,17 @@ function posAcao(acao, r, jogada, antes) {
     ui.ultimaCarta = S.e.descarte[S.e.descarte.length - 1].id;
     const soltar = () => { if (S.ui === ui && ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; if (S.tela === 'mesa') render(); } };
     const itens = itensDaJogada(jogada);
-    if (antesDaCarta) {
+    if (ultimaNoPalco) {
+      ui.comboAte = Date.now() + antesDaCarta + 6000;
+      depois(() => {
+        ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar, true, true);
+        if (comboAtivo) voarDaMao(acao.jogador, jogada.fisicas, antes, comboAtivo);
+        ui.marcaTopo = marca; ui.topoSegurado = antes.topo;
+      });
+    } else if (antesDaCarta) {
       const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
       ui.comboAte = Date.now() + antesDaCarta + duracoesJogada(itens.length, efeito, q).total;
-      depois(() => { ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar, ultimaComCartas ? 'todas' : false); });
+      depois(() => { ui.comboAte = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar); });
     } else if (vaiAoPalco) {
       const fim = Date.now() + mostrarJogada(acao.jogador, itens, efeito, soltar, true);
       if (comboAtivo) voarDaMao(acao.jogador, jogada.fisicas, antes, comboAtivo);
@@ -1325,7 +1346,7 @@ const SETAS_REVERSO = `<div class="reverso-setas"><svg viewBox="0 0 100 100" ari
       <defs><marker id="ponta-rev" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
       <path d="M50 8 A42 42 0 0 1 92 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/>
       <path d="M50 92 A42 42 0 0 1 8 50" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" marker-end="url(#ponta-rev)"/></svg></div>`;
-function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false) {
+function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false, ultima = false) {
   if (comboAtivo) comboAtivo.remove();
   const n = itens.length, combo = n > 1;
   const nomeEf = efeito ? (efeito.tipo === 'reverso' ? 'REVERSO!' : 'PULOU!') : '';
@@ -1333,11 +1354,27 @@ function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false) {
   const p = criarPalco('combo-show', combo ? `${nomeJog(idJog)} jogou um combo de ${n} cartas` : `${nomeJog(idJog)}: ${nomeEf}`);
   if (!p) { aoPousar(); return 0; }
   const { palco, area, r } = p;
-  montarEfeito(area, r, idJog, combo ? 'COMBO!' : nomeEf, combo ? '' : subEf, itens);
+  montarEfeito(area, r, idJog, ultima ? 'ÚLTIMA!' : combo ? 'COMBO!' : nomeEf, ultima ? 'Só falta 1 carta' : combo ? '' : subEf, itens);
   if (daMao) palco.classList.add('da-mao'); // as cartas chegam voando da mão, não caem do alto
-  if (daMao === 'todas') palco.querySelectorAll('.combo-carta').forEach((x) => x.classList.add('chegou')); // já vieram do ÚLTIMA!
   comboAtivo = palco;
   const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (ultima && !reduzido) {
+    // ÚLTIMA! primeiro (cartas chegam e se abrem), depois só o título vira COMBO!/efeito, e as cartas vão ao monte
+    tocar('ultima');
+    const V = duracaoVooMao(n), U = V + 1100;
+    if (combo) setTimeout(() => palco.isConnected && palco.classList.add('espalha'), V + 120);
+    let tB = U;
+    if (combo) setTimeout(() => { if (palco.isConnected) { trocarTitulo(area, 'COMBO!', ''); tocar('combo'); } }, U);
+    if (efeito) { tB = combo ? U + 600 : U; setTimeout(() => { if (palco.isConnected) efeitoNaJogada(palco, area, idJog, efeito, true, nomeEf, subEf); }, tB); }
+    const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
+    const durB = !efeito ? 700 : efeito.tipo === 'reverso' ? 1500 : (q + 1) * SALTO + 350;
+    const tC = tB + durB, tFim = tC + (n - 1) * 110 + 260, total = tFim + 350;
+    if (!combo) setTimeout(() => palco.isConnected && palco.classList.add('espalha'), tB);
+    setTimeout(() => { if (palco.isConnected) recolherNaPilha(palco, 110, 260); }, tC);
+    setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, tFim);
+    setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, total);
+    return total;
+  }
   if (combo) tocar('combo');
   if (reduzido) {
     if (efeito) efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf);
@@ -1355,13 +1392,17 @@ function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false) {
   setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, d.total);
   return d.total;
 }
+// Troca o título (e a legenda) do palco sem mexer nas cartas
+function trocarTitulo(area, titulo, sub) {
+  const t = area.querySelector('.anim-titulo');
+  if (t) { const novo = t.cloneNode(); novo.textContent = titulo; t.replaceWith(novo); }
+  const cab = area.querySelector('.anim-cab'), velho = cab && cab.querySelector('.anim-sub');
+  if (velho) velho.remove();
+  if (sub && cab) cab.insertAdjacentHTML('beforeend', `<span class="anim-sub">${esc(sub)}</span>`);
+}
 // O efeito da jogada, no mesmo palco: as setas do Reverso ou a bolinha da vez saltando no Pular
 function efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf) {
-  if (combo) { // o título troca de COMBO! para o efeito
-    const t = area.querySelector('.anim-titulo');
-    if (t) { const novo = t.cloneNode(); novo.textContent = nomeEf; t.replaceWith(novo); }
-    if (subEf) area.querySelector('.anim-cab').insertAdjacentHTML('beforeend', `<span class="anim-sub">${esc(subEf)}</span>`);
-  }
+  if (combo) trocarTitulo(area, nomeEf, subEf); // o título troca de COMBO! (ou ÚLTIMA!) para o efeito
   if (efeito.tipo === 'reverso') {
     palco.classList.add('reverso-show', efeito.sentido === 1 ? 'horario' : 'anti');
     area.style.setProperty('--cor', VAR_COR[S.e.corAtual]);
@@ -1404,27 +1445,32 @@ function efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf) {
 // ---------- CORTOU!: carta idêntica fora da vez ----------
 const SALTO_CORTE = 420;
 function duracaoCorte(temVez) { const fimBola = temVez ? 900 + 2 * SALTO_CORTE + 200 : 1300; return fimBola + 260 + 350; }
-function mostrarCorte(idJog, item, perderam, destino, aoPousar) {
+function mostrarCorte(idJog, item, perderam, destino, aoPousar, ultima = false) {
   if (comboAtivo) comboAtivo.remove();
   const p = criarPalco('combo-show corte-show', `${nomeJog(idJog)} cortou a jogada`);
   if (!p) { aoPousar(); return 0; }
   const { palco, area, r } = p;
   // duas cartas iguais: a do topo (já na mesa) e a que corta, caindo em cima
-  montarEfeito(area, r, idJog, 'CORTOU!', perderam.length ? (perderam.length === 1 ? `${nomeJog(perderam[0]).replace('Bot ', '')} perdeu a vez` : `${perderam.length} perderam a vez`) : '', [item, item]);
+  const subCorte = perderam.length ? (perderam.length === 1 ? `${nomeJog(perderam[0]).replace('Bot ', '')} perdeu a vez` : `${perderam.length} perderam a vez`) : '';
+  montarEfeito(area, r, idJog, ultima ? 'ÚLTIMA!' : 'CORTOU!', ultima ? 'Só falta 1 carta' : subCorte, [item, item]);
   const cartas = area.querySelectorAll('.combo-carta');
+  // com ÚLTIMA!: a carta do topo já está lá; a que corta chega voando da mão (alvo do voo)
+  const U = ultima ? duracaoVooMao(1) + 1100 : 0;
+  if (ultima) { palco.classList.add('da-mao'); cartas[0].classList.add('chegou'); palco.alvosVoo = [cartas[1]]; }
   cartas[0].style.animation = 'none';
   cartas[0].style.setProperty('--x', '-6px'); cartas[0].style.setProperty('--y', '4px'); cartas[0].style.setProperty('--r', '-4deg');
   cartas[1].style.animationDelay = '350ms';
   cartas[1].style.setProperty('--x', '14px'); cartas[1].style.setProperty('--y', '-8px'); cartas[1].style.setProperty('--r', '7deg');
   area.querySelector('.efeito-cartas').insertAdjacentHTML('beforeend', '<div class="corte-lamina" aria-hidden="true"><span class="corte-tesoura">✂</span></div>');
   comboAtivo = palco;
-  tocar('jogar');
+  tocar(ultima ? 'ultima' : 'jogar');
+  if (ultima) setTimeout(() => { if (palco.isConnected) trocarTitulo(area, 'CORTOU!', subCorte); }, U);
   const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const temVez = !!destino && !reduzido;
-  const total = duracaoCorte(temVez);
-  setTimeout(() => { if (!palco.isConnected) return; palco.classList.add('cortando'); tocar('corte'); }, 650);
-  setTimeout(() => palco.classList.add('espalha'), 600);
-  if (temVez) setTimeout(() => { if (palco.isConnected) bolaDaVez(palco, [perderam[0] || idJog, idJog, destino], perderam); }, 900);
+  const total = duracaoCorte(temVez) + U;
+  setTimeout(() => { if (!palco.isConnected) return; palco.classList.add('cortando'); tocar('corte'); }, U + 650);
+  setTimeout(() => palco.classList.add('espalha'), U + 600);
+  if (temVez) setTimeout(() => { if (palco.isConnected) bolaDaVez(palco, [perderam[0] || idJog, idJog, destino], perderam); }, U + 900);
   const tRecolhe = total - 350 - 260;
   setTimeout(() => { if (palco.isConnected) recolherNaPilha(palco, 0, 260); }, tRecolhe);
   setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, tRecolhe + 260);
@@ -1642,7 +1688,7 @@ function voarDaMao(id, fisicas, antes, palco = null) {
     }
     if (palco) {
       // base da ação: a carta k do palco (ainda escondida) aparece quando a voadora chega
-      const alvo = palco.querySelectorAll('.combo-carta')[k];
+      const alvo = (palco.alvosVoo || palco.querySelectorAll('.combo-carta'))[k];
       if (!alvo || !origem) { if (alvo) alvo.classList.add('chegou'); return; }
       // a própria carta do palco sai da mão até o lugar dela: não troca de elemento no meio do caminho (sem pulo)
       const giro = (parseFloat(alvo.style.getPropertyValue('--r')) || 0) * 0.4;

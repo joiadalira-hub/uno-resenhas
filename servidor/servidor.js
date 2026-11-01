@@ -273,7 +273,7 @@ class Sala {
   // Quanto tempo as animações deste evento levam nos celulares (para os bots e o relógio esperarem)
   esperaAnimacao(evento) {
     if (evento.tipo === 'inicio' || evento.tipo === 'rodada') return Math.min(this.e.jogadores.length, 8) * 1000 + 500;
-    let t = 0;
+    let t = 0, vooIncluido = false;
     const { jogada, r } = evento;
     const n = jogada ? jogada.fisicas.length : 0;
     // combo / Pular / Reverso: um palco só (cai → efeito → recolhe na pilha), igual ao celular
@@ -292,7 +292,16 @@ class Sala {
       const troca = (r.eventos || []).some((ev) => ev.tipo === 'troca');
       if (troca) t = Math.max(350, t) + 1900; // TROCOU!
       const ator = this.e.jogadores.find((j) => j.id === evento.acao.jogador);
-      if (ator && ator.mao.length === 1 && !troca && this.e.vulneravel !== ator.id) t = Math.max(350, t) + 1500; // ÚLTIMA! (quem esqueceu não tem animação)
+      if (ator && ator.mao.length === 1 && !troca && this.e.vulneravel !== ator.id) {
+        const corte = evento.acao.tipo === 'corte';
+        if (n > 1 || efeito || corte) {
+          // ÚLTIMA! e a jogada num palco só: cartas voam da mão → ÚLTIMA! → título vira COMBO!/efeito/CORTOU! → monte
+          const U = (n - 1) * 90 + 320 + 1100;
+          const durB = !efeito ? 700 : efeito === 'reverso' ? 1500 : (n + 1) * 520 + 350;
+          t = corte ? U + (900 + 2 * 420 + 200) + 260 + 350 : U + (n > 1 && efeito ? 600 : 0) + durB + (n - 1) * 110 + 260 + 350;
+          vooIncluido = true;
+        } else t = Math.max(350, t) + 1500; // ÚLTIMA! (quem esqueceu não tem animação)
+      }
     }
     const compradas = r && r.compradas ? r.compradas.length : 0;
     if (compradas) {
@@ -302,7 +311,7 @@ class Sala {
       t = Math.max(t, forcada ? Math.max(1500, voo + 400) : voo); // +N na tela de todos
     }
     // as cartas saem da mão de quem jogou até o monte antes de tudo (90 ms entre cartas, 320 ms cada)
-    if (jogada && evento.acao && (evento.acao.tipo === 'jogar' || evento.acao.tipo === 'corte')) t += (n - 1) * 90 + 320;
+    if (!vooIncluido && jogada && evento.acao && (evento.acao.tipo === 'jogar' || evento.acao.tipo === 'corte')) t += (n - 1) * 90 + 320;
     if (evento.acao && evento.acao.tipo === 'desafiar') t = Math.max(t, 2000);
     if (evento.acao && evento.acao.tipo === 'pegou') t = Math.max(t, 1700); // ESQUECEU! + as cartas
     if (evento.acao && evento.acao.tipo === 'ultima' && this.e.fase === 'jogando') { const j = this.e.jogadores.find((x) => x.id === evento.acao.jogador); if (j && j.mao.length === 1) t = Math.max(t, 1500); } // ÚLTIMA! atrasado

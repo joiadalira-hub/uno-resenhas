@@ -129,6 +129,11 @@ def pintar_fundo(a, cor, protegido=None):
             ny, nx = y + dy, x + dx
             if 0 <= ny < h and 0 <= nx < w and pode[ny, nx] and not vis[ny, nx]:
                 vis[ny, nx] = True; q.append((ny, nx))
+    # buracos dos números dos cantos (o "buraco do 6"): preto fechado dentro do algarismo também vira a cor
+    lab, _ = ndimage.label(pode & ~vis)
+    for i, sl in enumerate(ndimage.find_objects(lab)):
+        y0, y1, x0, x1 = sl[0].start, sl[0].stop, sl[1].start, sl[1].stop
+        if (y1 < 200 and x1 < 260) or (y0 > h - 200 and x0 > w - 260): vis |= lab == i + 1
     t = (lum / 255.0)[..., None]
     novo = a.copy(); mix = np.array(CORES[cor], float) * (1 - t) + 255 * t
     novo[vis] = mix[vis]

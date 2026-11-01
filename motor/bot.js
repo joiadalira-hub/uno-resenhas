@@ -1,15 +1,15 @@
 // Uno Resenhas — bot simples: joga combos grandes de números, guarda coringas,
 // responde a compras quando pode e usa o Zero contra quem tem menos cartas.
 
-import { CORES } from './cartas.js';
+import { coresDoModo } from './cartas.js';
 import { jogadasPossiveis } from './regras.js';
 
 const ehCartaCoringa = (c) => c.tipo === 'coringa' || c.tipo === '+5' || c.tipo === 'ctrl';
 
-function corPreferida(mao) {
-  const cont = Object.fromEntries(CORES.map((c) => [c, 0]));
-  for (const c of mao) if (c.cor) cont[c.cor] += 1;
-  return CORES.reduce((a, b) => (cont[b] > cont[a] ? b : a), CORES[0]);
+function corPreferida(mao, cores) {
+  const cont = Object.fromEntries(cores.map((c) => [c, 0]));
+  for (const c of mao) if (c.cor && cont[c.cor] !== undefined) cont[c.cor] += 1;
+  return cores.reduce((a, b) => (cont[b] > cont[a] ? b : a), cores[0]);
 }
 
 function nota(e, j, p) {
@@ -32,7 +32,7 @@ export function escolherAcao(e, idBot) {
   }
   const melhor = possiveis.reduce((a, b) => (nota(e, j, b) > nota(e, j, a) ? b : a));
   const resto = j.mao.filter((c) => !melhor.ids.includes(c.id));
-  const acao = { tipo: 'jogar', jogador: idBot, cartas: melhor.ids, cor: corPreferida(resto), ultima: resto.length === 1 };
+  const acao = { tipo: 'jogar', jogador: idBot, cartas: melhor.ids, cor: corPreferida(resto, coresDoModo(e.opcoes.cores || 5)), ultima: resto.length === 1 };
   const ult = melhor.efetivas[melhor.efetivas.length - 1];
   if (ult.tipo === 'num' && ult.valor === 0) {
     const outros = e.jogadores.filter((x) => x.id !== idBot);

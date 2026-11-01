@@ -2,9 +2,10 @@
 // Roda igual no navegador e no servidor. O servidor é o árbitro: os celulares só
 // mandam ações ({tipo:'jogar', cartas:[...]}) e o motor decide se valem.
 
-import { CORES, criarBaralho, pontosDaCarta, PONTOS_COLOCACAO } from './cartas.js';
+import { coresDoModo, criarBaralho, pontosDaCarta, PONTOS_COLOCACAO } from './cartas.js';
 
 export const OPCOES_PADRAO = {
+  cores: 5,                  // 4 = Tradicional (+4), 5 = Resenhas (+5), 6 = Resenhas estendido (rosa, +6)
   acumularCompras: true,      // +2 sobre +2, +5 sobre +5
   mais2NaoRespondeMais5: true, // +5 só é respondido por +5 (ou Ctrl+C)
   mais5SobreMais2: true,      // um +2 pode ser respondido com +5
@@ -40,6 +41,7 @@ function embaralhar(lista, rng) {
 }
 const ehCoringa = (t) => t === 'coringa' || t === '+5';
 const ehCompra = (t) => t === '+2' || t === '+5';
+const maisN = (e) => '+' + (e.opcoes.cores || 5); // nome do coringa de compra: +4, +5 ou +6
 // "Face" de uma carta efetiva: o que precisa ser igual num combo
 const face = (e) => (e.tipo === 'num' ? `n${e.valor}` : e.tipo);
 
@@ -65,7 +67,7 @@ export function novaPartida({ jogadores, opcoes = {}, semente } = {}) {
 
 export function iniciarRodada(e) {
   e.rodada += 1;
-  e.monte = embaralhar(criarBaralho(), e.rng);
+  e.monte = embaralhar(criarBaralho(e.opcoes.cores || 5), e.rng);
   e.descarte = [];
   e.sentido = 1;
   e.compraPendente = null;  // { tipo:'+2'|'+5', quantidade }
@@ -172,7 +174,7 @@ function checarJogada(e, idJogador, idsCartas, { foraDaVez }) {
     const defesaCtrl = cartas[0].tipo === 'ctrl';
     if (!ehCompra(primeira.tipo)) throw new ErroJogada('compra_pendente', `Você precisa responder com ${p.tipo} ou comprar ${p.quantidade}`);
     if (!e.opcoes.acumularCompras && !defesaCtrl) throw new ErroJogada('sem_acumular', `Compre ${p.quantidade} cartas`);
-    if (p.tipo === '+5' && primeira.tipo === '+2' && e.opcoes.mais2NaoRespondeMais5) throw new ErroJogada('mais2_mais5', 'Um +5 só pode ser respondido com +5');
+    if (p.tipo === '+5' && primeira.tipo === '+2' && e.opcoes.mais2NaoRespondeMais5) throw new ErroJogada('mais2_mais5', `Um ${maisN(e)} só pode ser respondido com ${maisN(e)}`);
     if (p.tipo === '+2' && primeira.tipo === '+5' && !e.opcoes.mais5SobreMais2) throw new ErroJogada('mais5_mais2', 'Um +2 só pode ser respondido com +2');
   } else if (!combinaComTopo(e, primeira)) {
     throw new ErroJogada('nao_combina', 'A primeira carta precisa combinar com a cor, o número ou o símbolo do topo');
@@ -254,10 +256,10 @@ function jogar(e, acao, foraDaVez) {
   let cor = ultimaEf.cor;
   if (ehCoringa(ultimaEf.tipo)) {
     if (!vence) {
-      if (!CORES.includes(acao.cor)) throw new ErroJogada('cor', 'Escolha uma cor');
+      if (!coresDoModo(e.opcoes.cores || 5).includes(acao.cor)) throw new ErroJogada('cor', 'Escolha uma cor');
       cor = acao.cor;
     }
-  } else if (e.opcoes.regraDo5 && ultimaEf.tipo === 'num' && ultimaEf.valor === 5 && CORES.includes(acao.cor)) {
+  } else if (e.opcoes.regraDo5 && ultimaEf.tipo === 'num' && ultimaEf.valor === 5 && coresDoModo(e.opcoes.cores || 5).includes(acao.cor)) {
     cor = acao.cor;
   }
   const zero = ultimaEf.tipo === 'num' && ultimaEf.valor === 0 && !vence;
@@ -320,7 +322,7 @@ function jogar(e, acao, foraDaVez) {
       break;
     case '+2':
     case '+5': {
-      const por = ultimaEf.tipo === '+2' ? 2 : 5;
+      const por = ultimaEf.tipo === '+2' ? 2 : ultimaEf.valor || 5;
       const antes = e.compraPendente ? e.compraPendente.quantidade : 0;
       e.compraPendente = { tipo: ultimaEf.tipo, quantidade: antes + por * n };
       break;
@@ -425,7 +427,7 @@ function pegou(e, acao) {
 
 function desafiar(e, acao) {
   const ij = idx(e, acao.jogador);
-  if (ij !== e.vez || !e.ultimoMais5 || !e.compraPendente) throw new ErroJogada('desafio', 'Não há +5 para desafiar');
+  if (ij !== e.vez || !e.ultimoMais5 || !e.compraPendente) throw new ErroJogada('desafio', `Não há ${maisN(e)} para desafiar`);
   const j = e.jogadores[ij];
   const autor = e.jogadores[idx(e, e.ultimoMais5.por)];
   const q = e.compraPendente.quantidade;

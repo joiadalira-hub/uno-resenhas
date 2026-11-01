@@ -288,3 +288,31 @@ test('bater no corte: opcional', () => {
     else assert.throws(() => aplicar(e, { tipo: 'corte', jogador: 'j2', cartas: [id] }), /bater no corte/);
   }
 });
+
+test('modos de cores: Tradicional (4) e Resenhas estendido (6)', () => {
+  const b4 = criarBaralho(4);
+  assert.equal(b4.length, 100 + 4 + 4 + 2);
+  assert.equal(b4.filter((c) => c.cor === 'roxo').length, 0);
+  assert.ok(b4.filter((c) => c.tipo === '+5').every((c) => c.valor === 4));
+  const b6 = criarBaralho(6);
+  assert.equal(b6.length, 150 + 6 + 6 + 3);
+  assert.equal(b6.filter((c) => c.cor === 'rosa').length, 25);
+  assert.equal(b6.filter((c) => c.tipo === '+5').length, 6);
+  assert.ok(b6.filter((c) => c.tipo === '+5').every((c) => c.valor === 6));
+  // +4 compra 4 e não aceita rosa no modo de 4 cores
+  const m4 = C('+5', null, 4);
+  const e = mesa({ maos: [[m4, ...extras()], extras()], topo: N('azul', 7), opcoes: { cores: 4 } });
+  assert.throws(() => aplicar(e, { tipo: 'jogar', jogador: 'j1', cartas: [m4.id], cor: 'roxo' }));
+  aplicar(e, { tipo: 'jogar', jogador: 'j1', cartas: [m4.id], cor: 'verde' });
+  assert.equal(e.compraPendente.quantidade, 4);
+  // +6 compra 6 e aceita rosa
+  const m6 = C('+5', null, 6);
+  const e6 = mesa({ maos: [[m6, ...extras()], extras()], topo: N('azul', 7), opcoes: { cores: 6 } });
+  aplicar(e6, { tipo: 'jogar', jogador: 'j1', cartas: [m6.id], cor: 'rosa' });
+  assert.equal(e6.compraPendente.quantidade, 6);
+  assert.equal(e6.corAtual, 'rosa');
+  // a partida nova monta o baralho do modo
+  const p6 = novaPartida({ jogadores: [{ id: 'a' }, { id: 'b' }], opcoes: { cores: 6 }, semente: 3 });
+  const total = p6.monte.length + p6.descarte.length + p6.jogadores.reduce((s, j) => s + j.mao.length, 0);
+  assert.equal(total, 165);
+});

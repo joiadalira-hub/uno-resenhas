@@ -17,10 +17,11 @@ const COR = {
   verde: ['#86C64A', '#3FB54A', '#6DC24A'],
   amarelo: ['#F8D84E', '#FCCC12', '#F9D650'],
   roxo: ['#A066E0', '#7434C2', '#9258D8'],
+  rosa: ['#FF92D2', '#FF5FBE', '#FF8ACD'],
 };
 const ESCURO = ['#58545A', '#2F2B2E', '#4A4649'];
 const ORDEM_ANEL = ['amarelo', 'verde', 'vermelho', 'roxo', 'azul']; // segmentos do anel do coringa
-const BASE = { vermelho: '#EE2626', azul: '#1D6BC0', verde: '#3FB54A', amarelo: '#FCCC12', roxo: '#8A45D6' };
+const BASE = { vermelho: '#EE2626', azul: '#1D6BC0', verde: '#3FB54A', amarelo: '#FCCC12', roxo: '#8A45D6', rosa: '#FF66C4' };
 const FONTE = "font-family: Inter, 'Helvetica Neue', sans-serif";
 
 function fundo(c) {
@@ -71,7 +72,8 @@ const ICONE = {
   },
   // cinco cartas em escada, uma de cada cor (o +4 dos exemplos ganhou a carta roxa)
   mais5: (cores, s = 9) => {
-    const pos = [[-112, 18], [-62, -36], [-12, -4], [38, -58], [88, -26]];
+    const pos = { 4: [[-75, 30], [-25, -24], [25, 8], [75, -46]], 5: [[-112, 18], [-62, -36], [-12, -4], [38, -58], [88, -26]],
+      6: [[-125, 44], [-75, -10], [-25, 22], [25, -32], [75, 0], [125, -54]] }[cores.length];
     return cores.map((c, i) => `<rect x="${pos[i][0] - 30}" y="${pos[i][1] - 44}" width="60" height="88" rx="7" fill="none" stroke="${c}" stroke-width="${s}"/>`).join('');
   },
   // Ctrl+C: o desenho de "copiar" (duas folhas) e a letra C dentro
@@ -85,7 +87,8 @@ const ICONE = {
   },
 };
 const CORES5 = ORDEM_ANEL.map((c) => BASE[c]);
-const ESCADA5 = ['verde', 'azul', 'vermelho', 'amarelo', 'roxo'].map((c) => BASE[c]);
+const ANEL = { 4: ['amarelo', 'verde', 'vermelho', 'azul'], 5: ORDEM_ANEL, 6: ['amarelo', 'verde', 'vermelho', 'roxo', 'azul', 'rosa'] };
+const ESCADA = { 4: ['verde', 'azul', 'vermelho', 'amarelo'], 5: ['verde', 'azul', 'vermelho', 'amarelo', 'roxo'], 6: ['verde', 'azul', 'vermelho', 'amarelo', 'roxo', 'rosa'] };
 const centro = (x) => `<g transform="translate(${W / 2} ${H / 2})">${x}</g>`;
 
 function carta(nome) {
@@ -102,17 +105,18 @@ function carta(nome) {
     const canto = t === 'mais2' ? cantos('+2') : t === 'pular' ? cantosIcone(ICONE.pular(16), 0.36) : cantosIcone(ICONE[t](20));
     return svg(fundo(COR[cor]) + canto + centro(`<g transform="scale(${t === 'mais2' ? 1.25 : t === 'reverso' ? 1.15 : 1.15})">${ICONE[t](t === 'reverso' ? 12 : undefined)}</g>`));
   }
-  if ((m = nome.match(/^(coringa|mais5|ctrl)(?:-(\w+))?$/))) {
-    const [, t, cor] = m;
+  if ((m = nome.match(/^(coringa|mais|ctrl)([456]?)(?:-(\w+))?$/))) {
+    const [, t, nn, cor] = m;
+    const n = Number(nn || 5);
     const bg = cor ? COR[cor] : ESCURO;
-    const branco = (n) => Array(n).fill('#fff');
+    const branco = (k) => Array(k).fill('#fff');
     if (t === 'coringa') {
-      const cores = cor ? branco(5) : CORES5;
+      const cores = cor ? branco(n) : ANEL[n].map((c) => BASE[c]);
       return svg(fundo(bg) + cantosIcone(ICONE.anel(cores, 30, 92), 0.5) + centro(ICONE.anel(cores, 20, 92)));
     }
-    if (t === 'mais5') {
-      const cores = cor ? branco(5) : ESCADA5;
-      return svg(fundo(bg) + cantos('+5') + centro(`<g transform="scale(1.25)">${ICONE.mais5(cores)}</g>`));
+    if (t === 'mais') {
+      const cores = cor ? branco(n) : ESCADA[n].map((c) => BASE[c]);
+      return svg(fundo(bg) + cantos('+' + n) + centro(`<g transform="scale(${n === 6 ? 1.15 : 1.25})">${ICONE.mais5(cores)}</g>`));
     }
     return svg(fundo(bg) + cantos('Ctrl+C', 74) + centro(`<g transform="scale(1.15)">${ICONE.ctrl(cor ? null : CORES5)}</g>`));
   }
@@ -129,8 +133,12 @@ function todas() {
   for (const c of Object.keys(COR)) {
     for (let v = 0; v <= 9; v++) l.push(`${c}-${v}`);
     for (const t of ['pular', 'reverso', 'mais2']) l.push(`${c}-${t}`);
-    for (const b of ['coringa', 'mais5', 'ctrl']) l.push(`${b}-${c}`);
+    if (c !== 'rosa') for (const b of ['coringa', 'mais5', 'ctrl']) l.push(`${b}-${c}`);
   }
+  // modos Tradicional (4 cores, +4) e Resenhas estendido (6 cores com rosa, +6)
+  l.push('coringa4', 'mais4', 'coringa6', 'mais6', 'ctrl-rosa');
+  for (const c of ['vermelho', 'azul', 'verde', 'amarelo']) l.push(`coringa4-${c}`, `mais4-${c}`);
+  for (const c of Object.keys(COR)) l.push(`coringa6-${c}`, `mais6-${c}`);
   return l;
 }
 

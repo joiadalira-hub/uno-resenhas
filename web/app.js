@@ -3,12 +3,17 @@
 
 let EU = 'eu'; // no online vira o id que o servidor deu para você
 const NOMES_BOTS = ['Ana', 'Rui', 'Bia', 'Léo', 'Duda', 'Caio', 'Mel', 'Nina', 'Tito'];
-const NOME_DA_COR = { vermelho: 'Vermelho', azul: 'Azul', verde: 'Verde', amarelo: 'Amarelo', roxo: 'Roxo' };
-const VAR_COR = { vermelho: 'var(--c-vermelho)', azul: 'var(--c-azul)', verde: 'var(--c-verde)', amarelo: 'var(--c-amarelo)', roxo: 'var(--c-roxo)' };
+const NOME_DA_COR = { vermelho: 'Vermelho', azul: 'Azul', verde: 'Verde', amarelo: 'Amarelo', roxo: 'Roxo', rosa: 'Rosa' };
+const VAR_COR = { vermelho: 'var(--c-vermelho)', azul: 'var(--c-azul)', verde: 'var(--c-verde)', amarelo: 'var(--c-amarelo)', roxo: 'var(--c-roxo)', rosa: 'var(--c-rosa)' };
+// Modos de cores: 4 = Tradicional (+4), 5 = Resenhas (+5), 6 = Resenhas estendido (rosa, +6)
+const MODOS = [[4, 'Tradicional', '4 cores · +4'], [5, 'Resenhas', '5 cores · +5'], [6, 'Resenhas estendido', '6 cores · +6']];
+const modoCores = () => Number((S.e && S.e.opcoes.cores) || (S.online && S.online.sala && S.online.sala.config && S.online.sala.config.opcoes && S.online.sala.config.opcoes.cores) || (!S.online && S.config && S.config.opcoes && S.config.opcoes.cores) || 5);
+const coresAtuais = () => coresDoModo(modoCores());
+const nomeMaisN = () => '+' + modoCores();
 const REGRAS_OPCIONAIS = [
-  ['acumularCompras', 'Acumular compras', '+2 sobre +2, +5 sobre +5'],
-  ['mais5SobreMais2', '+5 em cima de +2', 'Um +2 pode ser respondido com +5'],
-  ['mais2NaoRespondeMais5', '+2 não responde a +5', 'Só +5 ou Ctrl+C defendem um +5'],
+  ['acumularCompras', 'Acumular compras', '+2 sobre +2, +4/+5/+6 sobre +4/+5/+6'],
+  ['mais5SobreMais2', '+4/+5/+6 em cima de +2', 'Um +2 pode ser respondido com o coringa de compra'],
+  ['mais2NaoRespondeMais5', '+2 não responde a +4/+5/+6', 'Só outro coringa de compra ou Ctrl+C defendem'],
   ['vencerComEspecial', 'Vencer com carta especial', 'Libera vencer com coringa ou ação'],
   ['corte', 'Corte', 'Carta idêntica ao topo joga fora da vez'],
   ['baterNoCorte', 'Bater no corte', 'Com o Corte ligado: dá para ganhar cortando com a última carta'],
@@ -362,8 +367,7 @@ function ligarEscolhaDeck(raiz = document) {
   raiz.querySelectorAll('[data-deck]').forEach((b) => (b.onclick = () => { if (S.deck !== b.dataset.deck) trocarDeck(b.dataset.deck); }));
 }
 function imgCarta(c) {
-  if (c.tipo === 'coringa') return `${PASTA}/coringa.webp`;
-  if (c.tipo === '+5') return `${PASTA}/mais5.webp`;
+  if (c.tipo === 'coringa' || c.tipo === '+5') return `${PASTA}/${baseCoringa(c)}.webp`;
   if (c.tipo === 'ctrl') return `${PASTA}/ctrl.webp`;
   if (c.tipo === 'num') return `${PASTA}/${c.cor}-${c.valor}.webp`;
   return `${PASTA}/${c.cor}-${{ pular: 'pular', reverso: 'reverso', '+2': 'mais2' }[c.tipo]}.webp`;
@@ -371,32 +375,38 @@ function imgCarta(c) {
 // Carta do topo com animação: o preto do coringa se pinta com a cor escolhida;
 // o Ctrl+C se pinta e depois vira a carta que ele copiou.
 const ehPreta = (t) => t === 'coringa' || t === '+5' || t === 'ctrl';
-const baseCoringa = (t) => (t === '+5' ? 'mais5' : 'coringa');
+// coringa e +N mudam com o modo: coringa4/coringa6 (fatias), mais4/mais5/mais6
+const baseCoringa = (c) => (c.tipo === '+5' ? `mais${c.valor || modoCores()}` : modoCores() === 5 ? 'coringa' : `coringa${modoCores()}`);
 function htmlTopo(v, nova) {
   const fisica = v.cartaDoTopo, ef = v.topo, cor = v.corAtual;
   const alt = `Topo: ${esc(nomeCarta(fisica))}${fisica.tipo === 'ctrl' ? ' virou ' + esc(nomeCarta(ef)) : ''}`;
-  if (!ehPreta(fisica.tipo)) return `<div class="topo-pilha ${nova ? 'entrou' : ''}" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""></div>`;
-  const final = ehPreta(ef.tipo) ? `${PASTA}/${baseCoringa(ef.tipo)}-${cor}.webp` : imgCarta({ tipo: ef.tipo, cor: ef.cor, valor: ef.valor });
+  const sq = S.ui && S.ui.pousou ? ' sem-queda' : ''; // chegou voando da mão: não cai de novo
+  if (!ehPreta(fisica.tipo)) return `<div class="topo-pilha ${nova ? 'entrou' + sq : ''}" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""></div>`;
+  const final = ehPreta(ef.tipo) ? `${PASTA}/${baseCoringa(ef)}-${cor}.webp` : imgCarta({ tipo: ef.tipo, cor: ef.cor, valor: ef.valor });
   const selo = fisica.tipo === 'ctrl' ? '<span class="selo-ctrl">Ctrl+C</span>' : '';
   if (!nova) return `<div class="topo-pilha" role="img" aria-label="${alt}"><img src="${final}" alt="">${selo}</div>`;
   if (fisica.tipo !== 'ctrl') {
-    return `<div class="topo-pilha entrou" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""><img class="pinta" src="${final}" alt=""></div>`;
+    return `<div class="topo-pilha entrou${sq}" role="img" aria-label="${alt}"><img src="${imgCarta(fisica)}" alt=""><img class="pinta" src="${final}" alt=""></div>`;
   }
-  return `<div class="topo-pilha entrou" role="img" aria-label="${alt}"><img class="some-depois" src="${PASTA}/ctrl.webp" alt=""><img class="pinta some-depois" src="${PASTA}/ctrl-${cor}.webp" alt=""><img class="final-vira" src="${final}" alt="">${selo.replace('selo-ctrl', 'selo-ctrl atrasado')}</div>`;
+  return `<div class="topo-pilha entrou${sq}" role="img" aria-label="${alt}"><img class="some-depois" src="${PASTA}/ctrl.webp" alt=""><img class="pinta some-depois" src="${PASTA}/ctrl-${cor}.webp" alt=""><img class="final-vira" src="${final}" alt="">${selo.replace('selo-ctrl', 'selo-ctrl atrasado')}</div>`;
 }
 // Todas as cartas baixadas e prontas antes de precisar delas: a carta que outro jogador joga
 // aparece na hora na pilha e nas animações (antes ela só era baixada na primeira vez que aparecia)
 const CARTAS_PRONTAS = [];
+// só as do modo da mesa (4, 5 ou 6 cores): o jogo não baixa o que não vai usar
 function todasAsCartas() {
-  const l = ['coringa', 'mais5', 'ctrl', 'verso'];
-  for (const c of CORES) {
+  const n = modoCores(), cor = n === 5 ? 'coringa' : `coringa${n}`, mais = `mais${n}`;
+  const l = [cor, mais, 'ctrl', 'verso'];
+  for (const c of coresDoModo(n)) {
     for (let v = 0; v <= 9; v++) l.push(`${c}-${v}`);
     for (const t of ['pular', 'reverso', 'mais2']) l.push(`${c}-${t}`);
-    for (const b of ['coringa', 'mais5', 'ctrl']) l.push(`${b}-${c}`);
+    for (const b of [cor, mais, 'ctrl']) l.push(`${b}-${c}`);
   }
   return l.map((n) => `${PASTA}/${n}.webp`);
 }
+let deckPronto = '';
 function preCarregarDeck() {
+  deckPronto = PASTA + modoCores();
   CARTAS_PRONTAS.length = 0;
   for (const src of todasAsCartas()) {
     const i = new Image();
@@ -414,7 +424,7 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && locat
 
 function nomeCarta(c) {
   if (c.tipo === 'coringa') return 'Escolher cor';
-  if (c.tipo === '+5') return '+5';
+  if (c.tipo === '+5') return '+' + (c.valor || modoCores());
   if (c.tipo === 'ctrl') return 'Ctrl+C';
   const cor = c.cor ? NOME_DA_COR[c.cor] : '';
   if (c.tipo === 'num') return `${cor} ${c.valor}`;
@@ -434,7 +444,7 @@ function htmlSalasAbertas() {
   const modo = (m) => ({ vitorias: 'vitórias', sem_fim: 'sem fim', rodadas: 'rodadas', pontos: 'pontos' }[m] || m);
   return `<span class="rotulo">Salas para entrar</span>` + l.map((x) => `<button type="button" class="sala-item" data-sala="${esc(x.codigo)}">
       <span class="sala-nome">${x.temSenha ? '🔒 ' : ''}${esc(x.nome)}</span>
-      <span class="sala-info">${x.aberta ? 'Sala aberta' : 'Esperando começar'}${x.jogando ? ' · jogando agora' : ''} · ${modo(x.modo)}</span>
+      <span class="sala-info">${x.aberta ? 'Sala aberta' : 'Esperando começar'}${x.jogando ? ' · jogando agora' : ''} · ${modo(x.modo)} · ${(MODOS.find((m) => m[0] === (x.cores || 5)) || MODOS[1])[1]}</span>
       <b>${x.ocupados}/${x.lugares}</b></button>`).join('');
 }
 function ligarSalasAbertas() {
@@ -565,6 +575,11 @@ function telaInicio() {
   };
 }
 
+// escolha do modo de cores: três cartões com as bolinhas das cores
+function htmlModos(atual, attr) {
+  return `<div class="modos">${MODOS.map(([n, nome, sub]) => `<button type="button" class="modo-op" data-${attr}="${n}" aria-pressed="${atual === n}">
+    <span class="modo-cores">${coresDoModo(n).map((c) => `<i style="background:${VAR_COR[c]}"></i>`).join('')}</span><b>${nome}</b><small>${sub}</small></button>`).join('')}</div>`;
+}
 function telaCriar() {
   const c = S.config;
   const online = S.modoCriar === 'online';
@@ -589,6 +604,10 @@ function telaCriar() {
       <label class="chave" for="sala-aberta"><span style="display:flex;flex-direction:column"><span style="font-weight:700">Sala aberta</span><span class="ajuda">Gente entra e sai a cada mão, sem criar outra sala, até 10 na mesa. O placar mostra as mãos jogadas.</span></span>
         <input type="checkbox" id="sala-aberta" ${c.salaAberta ? 'checked' : ''}><span class="trilho" aria-hidden="true"></span></label>
     </section>` : ''}
+    <section class="bloco">
+      <h2 class="rotulo">Modo de jogo</h2>
+      ${htmlModos(c.opcoes.cores || 5, 'modo')}
+    </section>
     <section class="bloco">
       <h2 class="rotulo">Mesa</h2>
       <div class="linha"><span style="font-weight:700">Lugares na mesa</span>
@@ -635,6 +654,7 @@ function telaCriar() {
   app.querySelectorAll('[data-fimval]').forEach((b) => (b.onclick = () => { c.fimValor = Number(b.dataset.fimval); salvar(); }));
   app.querySelectorAll('[data-tempo]').forEach((b) => (b.onclick = () => { c.tempo = Number(b.dataset.tempo); salvar(); }));
   app.querySelectorAll('[data-op]').forEach((i) => (i.onchange = () => { c.opcoes[i.dataset.op] = i.checked; gravar('ur-config', c); }));
+  app.querySelectorAll('[data-modo]').forEach((b) => (b.onclick = () => { c.opcoes.cores = Number(b.dataset.modo); salvar(); }));
   const ab = document.getElementById('sala-aberta');
   if (ab) ab.onchange = () => { c.salaAberta = ab.checked; if (!ab.checked && c.fimModo === 'sem_fim') c.fimModo = 'rodadas'; if (c.fimModo === 'rodadas') c.fimValor = 5; salvar(); };
   app.querySelectorAll('[data-lugar]').forEach((b) => (b.onclick = () => {
@@ -754,9 +774,11 @@ function htmlAvatar(j) {
 }
 function telaMesa() {
   telaDesenhada = null;
+  if (deckPronto !== PASTA + modoCores()) preCarregarDeck(); // modo de cores novo: baixa as cartas dele
   const e = S.e, ui = S.ui, v = visaoDe(e, EU);
   const vez = minhaVez() && !ui.distribuindo && !ui.maoSegurada; // enquanto as cartas são distribuídas (ou as mãos trocam) ninguém joga
-  const mao = ui.maoSegurada || minhaMao().filter((c) => !(ui.pendentes && ui.pendentes.has(c.id)));
+  const atuais = minhaMao().filter((c) => !(ui.pendentes && ui.pendentes.has(c.id)));
+  const mao = ui.maoSegurada || (ui.saindo && ui.maoAntes ? ui.maoAntes.filter((c) => ui.saindo.has(c.id) || atuais.some((x) => x.id === c.id)).map((c) => atuais.find((x) => x.id === c.id) || c) : atuais);
   const fim = e.opcoes.fim;
   const rotRodada = fim.modo === 'rodadas' ? `Rodada ${e.rodada} de ${fim.valor}` : fim.modo === 'pontos' ? `Rodada ${e.rodada} · até ${fim.valor} pts` : e.opcoes.salaAberta ? `Mão ${e.rodada} · sala aberta` : fim.modo === 'vitorias' ? `Rodada ${e.rodada} · vitórias` : `Rodada ${e.rodada}`;
   const rivais = v.jogadores.filter((j) => j.id !== EU);
@@ -863,7 +885,7 @@ function telaMesa() {
       ${ui.combo ? `<button class="btn" id="cancelar">Cancelar</button>
         <button class="btn btn-principal duplo" id="jogar-combo" ${seqValida && seqValida.ok ? '' : 'disabled'}>Jogar ${ui.seq.length || ''} ${ui.seq.length === 1 ? 'carta' : 'cartas'}</button>`
       : `${e.comprou && vez ? '<button class="btn" id="passar">Passar</button>' : `<button class="btn" id="comprar" ${vez ? '' : 'disabled'}>${v.compraPendente && vez ? `Comprar ${v.compraPendente.quantidade}` : 'Comprar'}</button>`}
-        ${v.podeDesafiar ? '<button class="btn btn-perigo" id="desafiar">Desafiar +5</button>' : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
+        ${v.podeDesafiar ? '<button class="btn btn-perigo" id="desafiar">Desafiar ${nomeMaisN()}</button>' : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
         <button class="btn ${mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${mao.length <= 2 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
       </div>
     </div>
@@ -946,7 +968,7 @@ function abrirModal(m) { S.ui.modal = m; render(); }
 function renderModal() {
   const m = S.ui && S.ui.modal;
   if (!m) return '';
-  const cores = (comManter) => `<div class="cores">${CORES.map((c) => `<button data-cor="${c}" aria-label="${NOME_DA_COR[c]}" style="background:${VAR_COR[c]}"></button>`).join('')}</div>${comManter ? '<button class="btn" data-cor="">Manter a cor da carta</button>' : ''}`;
+  const cores = (comManter) => `<div class="cores" style="--n-cores:${coresAtuais().length}">${coresAtuais().map((c) => `<button data-cor="${c}" aria-label="${NOME_DA_COR[c]}" style="background:${VAR_COR[c]}"></button>`).join('')}</div>${comManter ? '<button class="btn" data-cor="">Manter a cor da carta</button>' : ''}`;
   let corpo = '';
   if (m.tipo === 'cor' || m.tipo === 'cor5') corpo = `<h2 style="font-size:24px">${m.tipo === 'cor5' ? 'Regra do 5: escolher a próxima cor?' : 'Escolha a próxima cor'}</h2>${cores(m.tipo === 'cor5')}`;
   if (m.tipo === 'zero') {
@@ -1048,6 +1070,9 @@ function posAcao(acao, r, jogada, antes) {
   const sentidoAntes = antes.sentido, maosAntes = antes.maos, minhasAntes = antes.minhas;
   ui.aviso = descrever(acao, r); ui.erro = false;
   somDaAcao(acao, r, jogada, combo, antes);
+  // Antes de tudo: as cartas saem da mão de quem jogou, viradas para cima, e vão até o monte
+  const voo = jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') ? voarDaMao(acao.jogador, jogada.fisicas, antes) : 0;
+  if (voo) ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + voo);
   // Combo, Pular e Reverso: uma animação só; as cartas só vão para a pilha no fim dela
   let efeito = null;
   if (jogada && S.e.sentido !== sentidoAntes) efeito = { tipo: 'reverso', sentido: S.e.sentido };
@@ -1060,7 +1085,7 @@ function posAcao(acao, r, jogada, antes) {
   const troca = (r.eventos || []).find((ev) => ev.tipo === 'troca');
   const ator1 = S.e.fase === 'jogando' && S.e.jogadores.find((j) => j.id === acao.jogador);
   const jogouAvisado = !!jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte') && !troca && ator1 && ator1.mao.length === 1 && S.e.vulneravel !== ator1.id;
-  let antesDaCarta = 0;
+  let antesDaCarta = voo; // combo, Pular, Reverso e corte começam quando as cartas chegam
   if (jogouAvisado) {
     const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
     const marca = (ui.marcaTopo || 0) + 1;
@@ -1158,7 +1183,7 @@ function posAcao(acao, r, jogada, antes) {
         ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + dur);
         continue;
       }
-      const sub = acao.tipo === 'pegou' ? 'Não disse Última!' : acao.tipo === 'desafiar' ? (r.resultado === 'ilegal' ? 'Desafio certo: o +5 era ilegal' : 'Desafio errado: +2 de castigo') : `Comprou ${d} ${d === 1 ? 'carta' : 'cartas'}`;
+      const sub = acao.tipo === 'pegou' ? 'Não disse Última!' : acao.tipo === 'desafiar' ? (r.resultado === 'ilegal' ? `Desafio certo: o ${nomeMaisN()} era ilegal` : 'Desafio errado: +2 de castigo') : `Comprou ${d} ${d === 1 ? 'carta' : 'cartas'}`;
       const dur = Math.max(1500, duracaoCompra(d) + 400);
       mostrarCompraForcada(id, d, sub, dur);
       ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + dur);
@@ -1233,7 +1258,7 @@ function itensDaJogada(jogada) {
   const cor = S.e.corAtual;
   return jogada.fisicas.map((c, i) => {
     const ef = jogada.efetivas[i];
-    if (c.tipo === 'coringa' || c.tipo === '+5') return { src: `${PASTA}/${baseCoringa(c.tipo)}-${cor}.webp` };
+    if (c.tipo === 'coringa' || c.tipo === '+5') return { src: `${PASTA}/${baseCoringa(c)}-${cor}.webp` };
     if (c.tipo === 'ctrl') return { src: `${PASTA}/ctrl-${ehPreta(ef.tipo) ? cor : ef.cor}.webp`, rotulo: `= ${nomeCarta(ef)}` };
     return { src: imgCarta(c) };
   });
@@ -1555,6 +1580,79 @@ function mostrarTroca(a, b) {
   setTimeout(() => palco.remove(), DURACAO_TROCA);
 }
 
+// ---------- cartas saindo da mão de quem jogou até o monte ----------
+const VOO_PASSO = 90, VOO_DUR = 320;
+const duracaoVooMao = (n) => (n - 1) * VOO_PASSO + VOO_DUR;
+function voarDaMao(id, fisicas, antes) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0;
+  const ui = S.ui, n = fisicas.length, total = duracaoVooMao(n);
+  if (!document.querySelector('.topo-pilha')) return 0;
+  // a pilha segura a carta de antes até a última chegar
+  const marca = (ui.marcaTopo || 0) + 1;
+  ui.marcaTopo = marca;
+  ui.topoSegurado = antes.topo;
+  const ids = fisicas.map((c) => c.id);
+  if (id === EU) { ui.saindo = new Set(ids); ui.maoAntes = antes.minhasCartas; }
+  else { ui.mostrado = ui.mostrado || {}; ui.mostrado[id] = antes.maos[id]; }
+  fisicas.forEach((c, k) => setTimeout(() => {
+    if (S.ui !== ui || S.tela !== 'mesa') return;
+    let origem = null;
+    if (id === EU) {
+      const el = document.querySelector(`.mao [data-carta="${c.id}"]`);
+      if (el) origem = el.getBoundingClientRect();
+      if (ui.saindo) { ui.saindo.delete(c.id); if (!ui.saindo.size) ui.saindo = null; }
+      render();
+    } else {
+      const el = document.querySelector(`.assento[data-id="${id}"] .leque`) || document.querySelector(`.assento[data-id="${id}"] .avatar`);
+      if (el) { const b = el.getBoundingClientRect(); const w = Math.max(26, b.height * 0.62); origem = { left: b.left + b.width / 2 - w / 2, top: b.top, width: w, height: w * 1.54 }; }
+      saiuCarta(id, antes.maos[id] - k - 1);
+    }
+    const destino = document.querySelector('.topo-pilha'); // depois do render: o elemento novo
+    if (destino && origem) {
+      const b = destino.getBoundingClientRect(), w = destino.offsetWidth, h = destino.offsetHeight; // a pilha é girada: o tamanho real vem do offset
+      voarCarta(c, origem, { left: b.left + b.width / 2 - w / 2, top: b.top + b.height / 2 - h / 2, width: w, height: h });
+    }
+  }, k * VOO_PASSO));
+  // a última chegou: a pilha mostra a carta nova sem cair de novo (o coringa ainda se pinta)
+  setTimeout(() => {
+    if (S.ui !== ui) return;
+    if (ui.mostrado && ui.mostrado[id] !== undefined && id !== EU) delete ui.mostrado[id];
+    ui.saindo = null;
+    if (ui.marcaTopo === marca && ui.topoSegurado) { ui.topoSegurado = null; ui.pousou = true; if (S.tela === 'mesa') render(); ui.pousou = false; }
+  }, total);
+  return total;
+}
+function voarCarta(c, de, para) {
+  const el = document.createElement('div');
+  el.className = 'voo-mao';
+  el.innerHTML = `<img src="${imgCarta(c)}" alt="">`;
+  Object.assign(el.style, { left: para.left + 'px', top: para.top + 'px', width: para.width + 'px', height: para.height + 'px' });
+  el.style.setProperty('--w', para.width + 'px');
+  document.body.appendChild(el);
+  const dx = de.left + de.width / 2 - (para.left + para.width / 2), dy = de.top + de.height / 2 - (para.top + para.height / 2);
+  const giro = (Math.random() * 10 - 5).toFixed(1);
+  const a = el.animate([
+    { transform: `translate(${dx}px, ${dy}px) scale(${de.width / para.width})`, opacity: 1 },
+    { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 18}px) scale(${(de.width / para.width + 1) / 2}) rotate(${giro}deg)`, offset: 0.55 },
+    { transform: 'rotate(6deg)', opacity: 1 },
+  ], { duration: VOO_DUR, easing: 'cubic-bezier(.3,.6,.4,1)' });
+  a.onfinish = () => el.remove();
+  setTimeout(() => el.remove(), VOO_DUR + 400);
+}
+// a mão do adversário perde uma carta (o leque se reacomoda)
+function saiuCarta(id, n) {
+  const ui = S.ui;
+  if (!ui.mostrado || ui.mostrado[id] === undefined) return;
+  ui.mostrado[id] = Math.max(0, n);
+  const el = document.querySelector(`.assento[data-id="${id}"]`);
+  if (!el) return;
+  const c = el.querySelector('.contagem');
+  if (c) c.textContent = ui.mostrado[id];
+  el.classList.toggle('uma', ui.mostrado[id] === 1);
+  const lq = el.querySelector('.leque');
+  if (lq) ajustarLeque(lq, ui.mostrado[id]);
+}
+
 // ---------- ÚLTIMA! / ESQUECEU! quando alguém fica com uma carta ----------
 const DURACAO_ULTIMA = 1500;
 function mostrarUltima(id, disse, subPegou, dur = DURACAO_ULTIMA) {
@@ -1838,13 +1936,15 @@ function abrirConfigSala() {
   document.querySelectorAll('.fundo-config').forEach((x) => x.remove());
   const sala = S.online && S.online.sala;
   const atuais = sala ? { ...OPCOES_PADRAO, ...sala.config.opcoes } : { ...OPCOES_PADRAO, ...(S.e ? S.e.opcoes : S.config.opcoes) };
-  const cfg = { opcoes: Object.fromEntries(REGRAS_OPCIONAIS.map(([k]) => [k, !!atuais[k]])), tempo: sala ? sala.config.tempo : S.config.tempo };
+  const cfg = { opcoes: { ...Object.fromEntries(REGRAS_OPCIONAIS.map(([k]) => [k, !!atuais[k]])), cores: Number(atuais.cores) || 5 }, tempo: sala ? sala.config.tempo : S.config.tempo };
   const fundo = document.createElement('div');
   fundo.className = 'fundo-modal fundo-config';
   const desenhar = () => {
     fundo.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Regras da sala" style="max-height:85vh;overflow-y:auto">
       <h2 style="font-size:24px">Regras da sala</h2>
       <span class="ajuda" style="margin-top:-8px">${S.e && S.e.fase !== 'jogando' ? 'Valem a partir da próxima mão.' : 'Valem a partir da primeira mão.'}</span>
+      <span style="font-weight:700">Modo de jogo</span>
+      ${htmlModos(cfg.opcoes.cores, 'cfg-modo')}
       <div id="cfg-bots">${htmlBotsConfig()}</div>
       <span style="font-weight:700">Tempo por jogada</span>
       <div class="segmentos">${[[15, '15 s'], [20, '20 s'], [30, '30 s'], [0, 'Livre']].map(([v, r]) => `<button type="button" data-cfg-tempo="${v}" aria-pressed="${cfg.tempo === v}">${r}</button>`).join('')}</div>
@@ -1859,6 +1959,7 @@ function abrirConfigSala() {
       </div></div>`;
     fundo.querySelectorAll('[data-cfg-tempo]').forEach((b) => (b.onclick = () => { cfg.tempo = Number(b.dataset.cfgTempo); const y = fundo.querySelector('.modal').scrollTop; desenhar(); fundo.querySelector('.modal').scrollTop = y; }));
     fundo.querySelectorAll('[data-cfg]').forEach((i) => (i.onchange = () => { cfg.opcoes[i.dataset.cfg] = i.checked; }));
+    fundo.querySelectorAll('[data-cfg-modo]').forEach((b) => (b.onclick = () => { cfg.opcoes.cores = Number(b.dataset.cfgModo); const y = fundo.querySelector('.modal').scrollTop; desenhar(); fundo.querySelector('.modal').scrollTop = y; }));
     ligarBotsConfig();
     fundo.querySelector('#cfg-cancelar').onclick = () => fundo.remove();
     fundo.querySelector('#cfg-salvar').onclick = () => {
@@ -2451,7 +2552,7 @@ function telaEspera() {
       <button class="btn btn-icone" id="sair-espera" aria-label="Sair da sala"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div style="display:flex;flex-direction:column;min-width:0">
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
-        <span class="ajuda" style="font-size:13px">Sala ${esc(sala.codigo)}${sala.temSenha ? ' · com senha' : ''}${o.caiu ? ' · reconectando…' : ''}</span>
+        <span class="ajuda" style="font-size:13px">Sala ${esc(sala.codigo)} · ${(MODOS.find((m) => m[0] === modoCores()) || MODOS[1])[1]}${sala.temSenha ? ' · com senha' : ''}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
       <span style="margin-left:auto;display:flex;gap:6px">${botaoSom()}${botaoTelaCheia()}</span>
     </div>

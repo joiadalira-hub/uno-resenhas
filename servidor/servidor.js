@@ -37,7 +37,8 @@ function previa(req, caminho) {
   const base = `${proto}://${req.headers.host}`;
   const sala = caminho.startsWith('/s/') ? salas.get(caminho.slice(3, 8).toUpperCase()) : null;
   const titulo = sala ? `Entra na mesa "${sala.nome}" · Uno Resenhas` : 'Uno Resenhas';
-  const texto = sala ? `Bora jogar! Sala ${sala.codigo}${sala.config.salaAberta ? ' · sala aberta' : ''}. 5 cores, +5, Ctrl+C e muita resenha.` : '5 cores, +5, Ctrl+C e muita resenha. Jogue online com os amigos, direto no navegador.';
+  const NOME_MODO = { 4: 'Tradicional: 4 cores e +4', 5: '5 cores, +5', 6: 'Resenhas estendido: 6 cores e +6' };
+  const texto = sala ? `Bora jogar! Sala ${sala.codigo}${sala.config.salaAberta ? ' · sala aberta' : ''}. ${NOME_MODO[sala.config.opcoes.cores || 5]}, Ctrl+C e muita resenha.` : '5 cores, +5, Ctrl+C e muita resenha. Jogue online com os amigos, direto no navegador.';
   const t = escHtml(titulo), d = escHtml(texto);
   return `<meta name="description" content="${d}"><meta property="og:type" content="website"><meta property="og:site_name" content="Uno Resenhas">`
     + `<meta property="og:title" content="${t}"><meta property="og:description" content="${d}"><meta property="og:url" content="${escHtml(base + caminho)}">`
@@ -81,7 +82,7 @@ function salasParaEntrar() {
     if (sala.fase === 'espera') pode = sala.assentos.some((a) => a.tipo === 'aberto') || (sala.config.salaAberta && sala.assentos.length < sala.capacidade);
     else if (sala.fase === 'jogando' && sala.config.salaAberta) pode = humanos < sala.capacidade;
     if (!pode) continue;
-    lista.push({ codigo: sala.codigo, nome: sala.nome, temSenha: !!sala.senha, aberta: sala.config.salaAberta, jogando: sala.fase === 'jogando', ocupados, lugares: sala.config.salaAberta ? sala.capacidade : sala.assentos.length, modo: sala.config.fimModo });
+    lista.push({ codigo: sala.codigo, nome: sala.nome, temSenha: !!sala.senha, aberta: sala.config.salaAberta, jogando: sala.fase === 'jogando', ocupados, lugares: sala.config.salaAberta ? sala.capacidade : sala.assentos.length, modo: sala.config.fimModo, cores: sala.config.opcoes.cores || 5 });
   }
   return lista.slice(0, 30);
 }
@@ -114,6 +115,7 @@ class Sala {
       tempo: [0, 15, 20, 30].includes(Number(cfg.tempo)) ? Number(cfg.tempo) : 20,
       opcoes: typeof cfg.opcoes === 'object' && cfg.opcoes ? cfg.opcoes : {},
     };
+    this.config.opcoes.cores = [4, 5, 6].includes(Number(this.config.opcoes.cores)) ? Number(this.config.opcoes.cores) : 5; // 4, 5 ou 6 cores
     this.seq = 1;
     const dono = this.novoHumano(msg, conexao);
     this.dono = dono.id;
@@ -299,6 +301,8 @@ class Sala {
       const forcada = evento.acao && (evento.acao.tipo === 'pegou' || (evento.acao.tipo === 'comprar' && r.perdeuVez));
       t = Math.max(t, forcada ? Math.max(1500, voo + 400) : voo); // +N na tela de todos
     }
+    // as cartas saem da mão de quem jogou até o monte antes de tudo (90 ms entre cartas, 320 ms cada)
+    if (jogada && evento.acao && (evento.acao.tipo === 'jogar' || evento.acao.tipo === 'corte')) t += (n - 1) * 90 + 320;
     if (evento.acao && evento.acao.tipo === 'desafiar') t = Math.max(t, 2000);
     if (evento.acao && evento.acao.tipo === 'pegou') t = Math.max(t, 1700); // ESQUECEU! + as cartas
     if (evento.acao && evento.acao.tipo === 'ultima' && this.e.fase === 'jogando') { const j = this.e.jogadores.find((x) => x.id === evento.acao.jogador); if (j && j.mao.length === 1) t = Math.max(t, 1500); } // ÚLTIMA! atrasado
@@ -485,6 +489,7 @@ function tratar(conexao, msg, ctx) {
     const PERMITIDAS = ['acumularCompras', 'mais2NaoRespondeMais5', 'mais5SobreMais2', 'vencerComEspecial', 'corte', 'baterNoCorte', 'comprarAtePoder', 'morteSubita', 'regraDo5', 'regraDo9'];
     const novas = {};
     for (const k of PERMITIDAS) if (msg.opcoes && typeof msg.opcoes[k] === 'boolean') novas[k] = msg.opcoes[k];
+    if (msg.opcoes && [4, 5, 6].includes(Number(msg.opcoes.cores))) novas.cores = Number(msg.opcoes.cores); // baralho novo na próxima mão
     sala.config.opcoes = { ...sala.config.opcoes, ...novas };
     if ([0, 15, 20, 30].includes(Number(msg.tempo))) sala.config.tempo = Number(msg.tempo);
     if (sala.e) Object.assign(sala.e.opcoes, novas);

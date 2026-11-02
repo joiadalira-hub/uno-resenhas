@@ -296,11 +296,13 @@ class Sala {
     // combo / Pular / Reverso: um palco só (cai → efeito → recolhe na pilha), igual ao celular
     const ultEf = jogada ? jogada.efetivas[n - 1] : null;
     const efeito = evento.reverso ? 'reverso' : jogada && evento.acao && evento.acao.tipo !== 'corte' && this.e.fase === 'jogando' && ultEf.tipo === 'pular' ? 'pulo' : null;
+    // SUPREME COMBO (4+ cartas): intro dos raios e as cartas batendo no monte mais devagar
+    const sup = n >= 4, intro = sup ? 700 : 0, passo = sup ? 150 : 110, voo = sup ? 460 : 260;
     if (jogada && (n > 1 || efeito)) {
-      const tEspalha = 450 + n * 225 + 150;
+      const tEspalha = 450 + n * 225 + 150 + intro;
       const tB = efeito ? tEspalha + 350 : tEspalha;
       const durB = !efeito ? 700 : efeito === 'reverso' ? 1500 : (n + 1) * 520 + 350;
-      t = tB + durB + (n - 1) * 110 + 260 + 350;
+      t = tB + durB + (n - 1) * passo + voo + 350;
     }
     if (evento.acao && evento.acao.tipo === 'corte' && jogada) t = (this.e.fase === 'jogando' ? 900 + 2 * 420 + 200 : 1300) + 260 + 350; // CORTOU!
     if (jogada && this.e.fase === 'jogando') {
@@ -315,7 +317,7 @@ class Sala {
           // ÚLTIMA! e a jogada num palco só: cartas voam da mão → ÚLTIMA! → título vira COMBO!/efeito/CORTOU! → monte
           const U = (n - 1) * 90 + 320 + 1100;
           const durB = !efeito ? 700 : efeito === 'reverso' ? 1500 : (n + 1) * 520 + 350;
-          t = corte ? U + (900 + 2 * 420 + 200) + 260 + 350 : U + (n > 1 && efeito ? 600 : 0) + durB + (n - 1) * 110 + 260 + 350;
+          t = corte ? U + (900 + 2 * 420 + 200) + 260 + 350 : U + intro + (n > 1 && efeito ? 600 : 0) + durB + (n - 1) * passo + voo + 350;
           vooIncluido = true;
         } else t = Math.max(350, t) + 1500; // ÚLTIMA! (quem esqueceu não tem animação)
       }

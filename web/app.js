@@ -33,8 +33,8 @@ const app = document.getElementById('app');
 
 // ---------- sons ----------
 // sons/ : jogar, carta, combo e reverso vieram prontos; os outros foram criados para o jogo
-const NOMES_SONS = ['corte', 'jogar', 'carta', 'combo', 'reverso', 'pular', 'ataque', 'coringa', 'ctrl', 'trocar', 'espiar', 'nove', 'apertou', 'ultima', 'pegou', 'sua-vez', 'tique', 'erro', 'vitoria', 'vitoria-partida', 'derrota'];
-const VOLUME = { carta: 0.6, tique: 0.8, 'sua-vez': 0.9, apertou: 0.9 };
+const NOMES_SONS = ['raio', 'impacto', 'supreme', 'corte', 'jogar', 'carta', 'combo', 'reverso', 'pular', 'ataque', 'coringa', 'ctrl', 'trocar', 'espiar', 'nove', 'apertou', 'ultima', 'pegou', 'sua-vez', 'tique', 'erro', 'vitoria', 'vitoria-partida', 'derrota'];
+const VOLUME = { carta: 0.6, tique: 0.8, 'sua-vez': 0.9, apertou: 0.9, raio: 0.8, impacto: 0.75, supreme: 1 };
 const bancoSom = {};
 let somCartaEm = 0;
 // Web Audio: os sons ficam decodificados na memória e tocam na hora, sem o atraso do <audio>
@@ -1524,31 +1524,36 @@ function itensDaJogada(jogada) {
   });
 }
 // Mesmo tamanho e posição para todas as animações de efeito: cabeçalho logo acima das cartas no centro
-function montarEfeito(area, r, idJog, titulo, sub, itens) {
+function montarEfeito(area, r, idJog, titulo, sub, itens, supreme = false) {
   const n = itens.length;
   const altura = r.bottom - 12;
   const baixa = window.innerHeight < 560; // celular deitado: cabeçalho compacto
   const fonteTitulo = baixa ? Math.max(34, Math.min(window.innerHeight * 0.11, 60)) : Math.max(48, Math.min(window.innerWidth * 0.09, 96));
   const cabecalho = (baixa ? 46 + 26 : 84 + 34) + fonteTitulo * 0.95 + 24; // mesmo espaço em todas, para as cartas terem sempre o mesmo tamanho
-  const cw = Math.round(Math.max(60, Math.min(r.width * 0.22, (altura - cabecalho - 56) / 1.54, 140)));
-  const passo = n > 1 ? Math.min(cw * 0.62, (r.width * 0.9 - cw) / (n - 1)) : 0;
+  const cw0 = Math.round(Math.max(60, Math.min(r.width * 0.22, (altura - cabecalho - 56) / 1.54, 140)));
+  // SUPREME: as cartas vêm mais para perto (maiores) e abrem mais
+  const cw = supreme ? Math.round(Math.min(cw0 * 1.16, r.width * 0.27, (altura - cabecalho - 30) / 1.54)) : cw0;
+  const passo = n > 1 ? Math.min(cw * (supreme ? 0.7 : 0.62), (r.width * (supreme ? 0.98 : 0.9) - cw) / (n - 1)) : 0;
   area.style.setProperty('--cw', cw + 'px');
   area.innerHTML = `<div class="efeito-col">${htmlCabecalho(idJog, titulo, sub)}<div class="efeito-cartas">` + itens.map((it, i) => {
     const m = i - (n - 1) / 2;
-    return `<div class="combo-carta" style="--i:${i};--x:${(m * passo).toFixed(1)}px;--y:${(-m * 7).toFixed(1)}px;--r:${(m * 4).toFixed(1)}deg;z-index:${i + 2}">
+    return `<div class="combo-carta" style="--i:${i};--x:${(m * passo).toFixed(1)}px;--y:${(-m * (supreme ? 10 : 7) + (supreme ? m * m * 5 : 0)).toFixed(1)}px;--r:${(m * (supreme ? 6 : 4)).toFixed(1)}deg;z-index:${i + 2}">
       <img src="${it.src}" alt="">${it.rotulo ? `<span class="combo-rotulo">${esc(it.rotulo)}</span>` : ''}</div>`;
   }).join('') + '</div></div>';
 }
 // Uma jogada com animação, do começo ao fim, num palco só:
 // título (COMBO! ou o efeito) → cartas caem → efeito (PULOU!/REVERSO!) → cartas voltam uma a uma para a pilha.
 // A pilha só troca de carta quando a última pousa nela.
+const SUPREME_MIN = 4, SUPREME_INTRO = 700; // combo de 4 cartas ou mais
+const ritmoRecolhe = (n) => (n >= SUPREME_MIN ? { passo: 150, voo: 460 } : { passo: 110, voo: 260 });
 function duracoesJogada(n, efeito, q) {
-  const tEspalha = 450 + n * 225 + 150;
+  const tEspalha = 450 + n * 225 + 150 + (n >= SUPREME_MIN ? SUPREME_INTRO : 0);
   const tB = efeito ? tEspalha + 350 : tEspalha;
   const durB = !efeito ? 700 : efeito.tipo === 'reverso' ? 1500 : (q + 1) * SALTO + 350;
   const tC = tB + durB;
-  const tFim = tC + (n - 1) * 110 + 260;
-  return { tEspalha, tB, tC, tFim, total: tFim + 350 };
+  const { passo, voo } = ritmoRecolhe(n);
+  const tFim = tC + (n - 1) * passo + voo;
+  return { tEspalha, tB, tC, tFim, total: tFim + 350, passo, voo };
 }
 const SETAS_REVERSO = `<div class="reverso-setas"><svg viewBox="0 0 100 100" aria-hidden="true">
       <defs><marker id="ponta-rev" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
@@ -1562,7 +1567,10 @@ function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false, ultima = f
   const p = criarPalco('combo-show', combo ? `${nomeJog(idJog)} jogou um combo de ${n} cartas` : `${nomeJog(idJog)}: ${nomeEf}`);
   if (!p) { aoPousar(); return 0; }
   const { palco, area, r } = p;
-  montarEfeito(area, r, idJog, ultima ? 'ÚLTIMA!' : combo ? 'COMBO!' : nomeEf, ultima ? 'Só falta 1 carta' : combo ? '' : subEf, itens);
+  const supreme = n >= SUPREME_MIN;
+  montarEfeito(area, r, idJog, ultima ? 'ÚLTIMA!' : combo ? 'COMBO!' : nomeEf, ultima ? 'Só falta 1 carta' : combo ? '' : subEf, itens, supreme);
+  const { passo: pRec, voo: vRec } = ritmoRecolhe(n);
+  const recolher = () => (supreme ? recolherSupreme(palco, pRec, vRec) : recolherNaPilha(palco, pRec, vRec));
   if (daMao) palco.classList.add('da-mao'); // as cartas chegam voando da mão, não caem do alto
   comboAtivo = palco;
   const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1571,19 +1579,21 @@ function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false, ultima = f
     tocar('ultima');
     const V = duracaoVooMao(n), U = V + 1100;
     if (combo) setTimeout(() => palco.isConnected && palco.classList.add('espalha'), V + 120);
-    let tB = U;
-    if (combo) setTimeout(() => { if (palco.isConnected) { trocarTitulo(area, 'COMBO!', ''); tocar('combo'); } }, U);
-    if (efeito) { tB = combo ? U + 600 : U; setTimeout(() => { if (palco.isConnected) efeitoNaJogada(palco, area, idJog, efeito, true, nomeEf, subEf); }, tB); }
+    const base = supreme ? U + SUPREME_INTRO : U;
+    let tB = base;
+    if (combo) setTimeout(() => { if (palco.isConnected) { trocarTitulo(area, 'COMBO!', ''); tocar('combo'); if (supreme) iniciarSupreme(palco, area); } }, U);
+    if (efeito) { tB = combo ? base + 600 : base; setTimeout(() => { if (palco.isConnected) efeitoNaJogada(palco, area, idJog, efeito, true, nomeEf, subEf); }, tB); }
     const q = efeito && efeito.tipo === 'pulo' ? efeito.pulados.length : 0;
     const durB = !efeito ? 700 : efeito.tipo === 'reverso' ? 1500 : (q + 1) * SALTO + 350;
-    const tC = tB + durB, tFim = tC + (n - 1) * 110 + 260, total = tFim + 350;
+    const tC = tB + durB, tFim = tC + (n - 1) * pRec + vRec, total = tFim + 350;
     if (!combo) setTimeout(() => palco.isConnected && palco.classList.add('espalha'), tB);
-    setTimeout(() => { if (palco.isConnected) recolherNaPilha(palco, 110, 260); }, tC);
+    setTimeout(() => { if (palco.isConnected) recolher(); }, tC);
     setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, tFim);
     setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, total);
     return total;
   }
   if (combo) tocar('combo');
+  if (supreme) iniciarSupreme(palco, area);
   if (reduzido) {
     if (efeito) efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf);
     setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, 1800);
@@ -1595,10 +1605,86 @@ function mostrarJogada(idJog, itens, efeito, aoPousar, daMao = false, ultima = f
   const d = duracoesJogada(n, efeito, q);
   setTimeout(() => palco.classList.add('espalha'), d.tEspalha);
   if (efeito) setTimeout(() => { if (palco.isConnected) efeitoNaJogada(palco, area, idJog, efeito, combo, nomeEf, subEf); }, d.tB);
-  setTimeout(() => { if (palco.isConnected) recolherNaPilha(palco, 110, 260); }, d.tC);
+  setTimeout(() => { if (palco.isConnected) recolher(); }, d.tC);
   setTimeout(() => { aoPousar(); palco.classList.add('sai'); }, d.tFim);
   setTimeout(() => { palco.remove(); if (comboAtivo === palco) comboAtivo = null; }, d.total);
   return d.total;
+}
+// ---------- SUPREME COMBO (4 cartas ou mais): raios, voz e cartas batendo no monte ----------
+function raioAleatorio(w, h) {
+  // raio em zigue-zague de cima para baixo dentro de uma caixa w x h
+  let x = w * (0.3 + Math.random() * 0.4), y = 0, d = `M${x.toFixed(1)} 0`;
+  const passos = 5 + Math.floor(Math.random() * 3);
+  for (let i = 1; i <= passos; i++) { y = h * i / passos; x = Math.max(2, Math.min(w - 2, x + (Math.random() - 0.5) * w * 0.7)); d += ` L${x.toFixed(1)} ${y.toFixed(1)}`; }
+  return d;
+}
+function iniciarSupreme(palco, area) {
+  palco.classList.add('supreme');
+  const cab = area.querySelector('.anim-cab');
+  if (!cab || cab.querySelector('.supreme-tag')) return;
+  const leve = document.body.classList.contains('modo-leve') || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  cab.insertAdjacentHTML('afterbegin', `<div class="supreme-raios" aria-hidden="true">${[0, 1, 2, 3, 4, 5].map((k) => `<svg class="raio r${k}" viewBox="0 0 40 120" preserveAspectRatio="none"><path class="halo" d=""/><path class="nucleo" d=""/></svg>`).join('')}</div>`);
+  const titulo = cab.querySelector('.anim-titulo');
+  if (titulo) titulo.insertAdjacentHTML('beforebegin', '<span class="supreme-tag">SUPREME</span>');
+  else cab.insertAdjacentHTML('beforeend', '<span class="supreme-tag">SUPREME</span>');
+  const raios = [...cab.querySelectorAll('.supreme-raios .raio')];
+  const desenhar = () => raios.forEach((sv) => { const d = raioAleatorio(40, 120); sv.querySelectorAll('path').forEach((p) => p.setAttribute('d', d)); sv.style.opacity = Math.random() < 0.25 ? '0' : '1'; });
+  desenhar();
+  if (!leve) {
+    const t = setInterval(() => { if (!palco.isConnected || palco.classList.contains('recolhe')) { clearInterval(t); return; } desenhar(); }, 90);
+    const flash = document.createElement('div');
+    flash.className = 'supreme-flash';
+    palco.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+  }
+  tocar('raio');
+  tocarDepois('supreme', 160);
+}
+// as cartas sobem e descem de uma vez no monte, cada uma com um impacto
+function recolherSupreme(palco, passo, voo) {
+  const pilha = document.querySelector('.topo-pilha');
+  if (!pilha || !palco.isConnected) return;
+  palco.classList.add('recolhe');
+  const leve = document.body.classList.contains('modo-leve');
+  const alvo = pilha.getBoundingClientRect();
+  const ax = alvo.left + alvo.width / 2, ay = alvo.top + alvo.height / 2;
+  const cartas = [...palco.querySelectorAll('.combo-carta')];
+  cartas.forEach((el, i) => {
+    const b = el.getBoundingClientRect();
+    const x = parseFloat(el.style.getPropertyValue('--x')) || 0, y = parseFloat(el.style.getPropertyValue('--y')) || 0;
+    const r = parseFloat(el.style.getPropertyValue('--r')) || 0;
+    const dx = ax - (b.left + b.width / 2), dy = ay - (b.top + b.height / 2);
+    const escala = (pilha.offsetWidth * ZOOM.valor) / el.offsetWidth;
+    el.animate([
+      { transform: `translate(${x}px, ${y}px) rotate(${r}deg)`, easing: 'cubic-bezier(.2,.8,.3,1)' },
+      { transform: `translate(${x + dx * 0.25}px, ${y - 70}px) rotate(${r * 2 - 8}deg) scale(1.18)`, offset: 0.38, easing: 'cubic-bezier(.7,0,1,.6)' },
+      { transform: `translate(${x + dx}px, ${y + dy}px) rotate(6deg) scale(${escala * 0.9})`, offset: 0.86, easing: 'ease-out' },
+      { transform: `translate(${x + dx}px, ${y + dy}px) rotate(6deg) scale(${escala})` },
+    ], { duration: voo, delay: i * passo, fill: 'forwards' });
+    setTimeout(() => impactoNoMonte(ax, ay, alvo.width, i === cartas.length - 1, leve), i * passo + voo * 0.86);
+  });
+}
+function impactoNoMonte(x, y, w, ultimo, leve) {
+  if (!S.e) return;
+  tocar('impacto', ultimo ? 1 : 0.55);
+  const onda = document.createElement('div');
+  onda.className = 'supreme-onda' + (ultimo ? ' forte' : '');
+  Object.assign(onda.style, { left: x + 'px', top: y + 'px', width: w * 1.6 + 'px', height: w * 1.6 + 'px' });
+  document.body.appendChild(onda);
+  setTimeout(() => onda.remove(), 650);
+  if (leve) return;
+  for (let k = 0; k < (ultimo ? 10 : 5); k++) {
+    const f = document.createElement('i');
+    f.className = 'supreme-faisca';
+    const a = Math.random() * Math.PI * 2, dist = w * (0.6 + Math.random() * 0.9);
+    Object.assign(f.style, { left: x + 'px', top: y + 'px' });
+    f.style.setProperty('--fx', (Math.cos(a) * dist).toFixed(0) + 'px');
+    f.style.setProperty('--fy', (Math.sin(a) * dist).toFixed(0) + 'px');
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 600);
+  }
+  const mesa = document.querySelector('.mesa');
+  if (mesa) mesa.animate([{ transform: 'none' }, { transform: `translate(${ultimo ? 7 : 3}px, ${ultimo ? -5 : -2}px)` }, { transform: `translate(${ultimo ? -6 : -3}px, ${ultimo ? 4 : 2}px)` }, { transform: 'none' }], { duration: ultimo ? 260 : 150 });
 }
 // Troca o título (e a legenda) do palco sem mexer nas cartas
 function trocarTitulo(area, titulo, sub) {

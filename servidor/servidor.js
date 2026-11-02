@@ -323,7 +323,7 @@ class Sala {
     if (!vooIncluido && jogada && evento.acao && (evento.acao.tipo === 'jogar' || evento.acao.tipo === 'corte')) t += (n - 1) * 90 + 320;
     if (evento.acao && evento.acao.tipo === 'desafiar') t = Math.max(t, 2000);
     if (evento.acao && evento.acao.tipo === 'pegou') t = Math.max(t, 1700); // ESQUECEU! + as cartas
-    if (evento.acao && evento.acao.tipo === 'ultima' && this.e.fase === 'jogando') { const j = this.e.jogadores.find((x) => x.id === evento.acao.jogador); if (j && j.mao.length === 1) t = Math.max(t, 1500); } // ÚLTIMA! atrasado
+    if (evento.acao && evento.acao.tipo === 'ultima' && this.e.fase === 'jogando') { const j = this.e.jogadores.find((x) => x.id === evento.acao.jogador); if (j && j.mao.length === 1) t = Math.max(t, Math.max(0, (this.animaAte || 0) - Date.now()) + 1900); } // ÚLTIMA! atrasado: entra na fila, depois da animação que ainda roda
     return t;
   }
 

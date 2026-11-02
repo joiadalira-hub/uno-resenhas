@@ -865,6 +865,12 @@ body.paisagem .feltro .gravado { top: 9.5%; height: 21%; left: 29%; width: 42%; 
 .voto-lin.vago { border-style: dashed; opacity: .9; }
 .voto-lin.vago .inicial { background: transparent; color: var(--destaque); }
 .votos:has(.voto-acao) { grid-template-columns: minmax(0, 1fr); }
+/* "Última!" junto com o combo */
+.chip-ultima { display: flex; align-items: center; gap: 8px; align-self: flex-start; min-height: 36px; padding: 4px 12px 4px 6px; border-radius: 999px; border: 2px solid var(--destaque); background: rgba(255,212,59,.08); color: var(--texto); font: 700 14px var(--corpo); cursor: pointer; max-width: 100%; }
+.chip-ultima b { color: var(--destaque); margin: 0 .25em; }
+.chip-ultima .caixa { flex: none; width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--destaque); display: grid; place-items: center; font-size: 14px; color: var(--sobre-destaque); }
+.chip-ultima[aria-pressed="true"] { background: rgba(255,212,59,.22); }
+.chip-ultima[aria-pressed="true"] .caixa { background: var(--destaque); }
 </style>
 
 <div id="app"></div>

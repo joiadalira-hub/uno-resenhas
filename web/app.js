@@ -907,10 +907,13 @@ function telaMesa() {
   // jogáveis e combo
   const possiveis = vez ? jogadasPossiveis(e, EU) : [];
   const jogaveisSozinhas = new Set(possiveis.filter((p) => p.ids.length === 1).map((p) => p.ids[0]));
-  let candidatosCombo = new Set(), seqValida = null;
+  let candidatosCombo = new Set(), seqValida = null, podeUltimaCombo = false;
   if (ui.combo && vez) {
     for (const c of mao) if (!ui.seq.includes(c.id) && validarJogada(e, EU, [...ui.seq, c.id]).ok) candidatosCombo.add(c.id);
     if (ui.seq.length) seqValida = validarJogada(e, EU, ui.seq);
+    // o combo vai deixar 1 carta: dá para avisar "Última!" junto (e a animação sai numa só)
+    podeUltimaCombo = !!(seqValida && seqValida.ok && !seqValida.vence && ui.seq.length === minhaMao().length - 1 && !e.disseUltima[EU]);
+    if (!podeUltimaCombo) ui.comboUltima = false;
   }
   const comboDisponivel = vez && possiveis.some((p) => p.ids.length > 1);
   // Tamanho das cartas acompanha a tela (celular ou PC)
@@ -991,7 +994,8 @@ function telaMesa() {
     <div class="mao-zona">
       ${ui.combo ? `<div class="painel-combo">
         <div class="linha"><span style="font:800 16px var(--display);color:var(--destaque)">Montando combo</span>${seqValida && !seqValida.ok ? `<span class="ajuda" style="color:#FF8A82">${esc(seqValida.mensagem)}</span>` : ''}</div>
-        <div class="fichas">${fichas}</div></div>` : ''}
+        <div class="fichas">${fichas}</div>
+        ${podeUltimaCombo ? `<button type="button" class="chip-ultima" id="combo-ultima" aria-pressed="${!!ui.comboUltima}"><span class="caixa" aria-hidden="true">${ui.comboUltima ? '✓' : ''}</span>Dizer <b>Última!</b> junto com o combo</button>` : ''}</div>` : ''}
       <div class="mao-wrap"><div class="mao" style="--sobrepor:${sobrepor}px">
       ${mao.map((c) => {
         const i = ui.seq.indexOf(c.id);
@@ -1012,7 +1016,7 @@ function telaMesa() {
       </div>
       <div class="acoes">
       ${ui.combo ? `<button class="btn" id="cancelar">Cancelar</button>
-        <button class="btn btn-principal duplo" id="jogar-combo" ${seqValida && seqValida.ok ? '' : 'disabled'}>Jogar ${ui.seq.length || ''} ${ui.seq.length === 1 ? 'carta' : 'cartas'}</button>`
+        <button class="btn btn-principal duplo" id="jogar-combo" ${seqValida && seqValida.ok ? '' : 'disabled'}>Jogar ${ui.seq.length || ''} ${ui.seq.length === 1 ? 'carta' : 'cartas'}${podeUltimaCombo && ui.comboUltima ? ' + Última!' : ''}</button>`
       : `${e.comprou && vez ? '<button class="btn" id="passar">Passar</button>' : `<button class="btn" id="comprar" ${vez ? '' : 'disabled'}>${v.compraPendente && vez ? `Comprar ${v.compraPendente.quantidade}` : 'Comprar'}</button>`}
         ${v.podeDesafiar ? `<button class="btn btn-perigo" id="desafiar">Desafiar ${nomeMaisN()}</button>` : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
         <button class="btn ${jogando && mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${jogando && minhaMao().length <= 2 && minhaMao().length > 0 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
@@ -1056,7 +1060,8 @@ function ligarMesa() {
   if ($('desafiar')) $('desafiar').onclick = () => agir({ tipo: 'desafiar', jogador: EU });
   if ($('combo')) $('combo').onclick = () => { S.ui.combo = true; S.ui.seq = []; S.ui.aviso = 'A primeira carta precisa combinar com o topo'; S.ui.erro = false; render(); };
   if ($('cancelar')) $('cancelar').onclick = () => { S.ui.combo = false; S.ui.seq = []; S.ui.aviso = ''; render(); };
-  if ($('jogar-combo')) $('jogar-combo').onclick = () => prepararJogada([...S.ui.seq]);
+  if ($('jogar-combo')) $('jogar-combo').onclick = () => { const u = !!S.ui.comboUltima; S.ui.comboUltima = false; prepararJogada([...S.ui.seq], false, u); };
+  if ($('combo-ultima')) $('combo-ultima').onclick = () => { S.ui.comboUltima = !S.ui.comboUltima; render(); };
   if ($('ultima')) $('ultima').onclick = () => agir({ tipo: 'ultima', jogador: EU });
   if ($('ordem')) $('ordem').onclick = abrirOrdem;
   if ($('pegou')) $('pegou').onclick = () => agir({ tipo: 'pegou', jogador: EU, alvo: S.e.vulneravel });
@@ -1087,11 +1092,12 @@ function tocarCarta(id) {
 }
 
 // Junta as escolhas (cor, efeito do zero) antes de mandar a jogada ao motor
-function prepararJogada(ids, foraDaVez = false) {
+function prepararJogada(ids, foraDaVez = false, comUltima = false) {
   const v = validarJogada(S.e, EU, ids, { foraDaVez });
   if (!v.ok) { S.ui.aviso = v.mensagem; S.ui.erro = true; return render(); }
   const ult = v.efetivas[v.efetivas.length - 1];
   const acao = { tipo: foraDaVez ? 'corte' : 'jogar', jogador: EU, cartas: ids };
+  if (comUltima) acao.ultima = true;
   const passos = [];
   if (!v.vence && (ult.tipo === 'coringa' || ult.tipo === '+5')) passos.push('cor');
   if (!v.vence && S.e.opcoes.regraDo5 && ult.tipo === 'num' && ult.valor === 5) passos.push('cor5');
@@ -1210,12 +1216,34 @@ function fotoAntes() {
 }
 
 // Efeitos de uma jogada já aplicada (local ou vinda do servidor): aviso, sons, animações, compras
+// Fila de animações: espera a animação em curso (comboAte) e qualquer palco aberto fecharem
+function naFila(ui, fn, dur) {
+  const livre = Math.max(Date.now(), ui.comboAte || 0);
+  ui.comboAte = livre + dur; // estimativa: ninguém joga até lá
+  const tenta = () => {
+    if (S.ui !== ui || !S.e) return;
+    const falta = (ui.filaLivre || 0) - Date.now();
+    if (falta > 20) return setTimeout(tenta, falta);
+    if (document.querySelector('.palco')) return setTimeout(tenta, 120);
+    ui.filaLivre = Date.now() + dur;
+    ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + dur);
+    fn();
+  };
+  ui.filaLivre = Math.max(ui.filaLivre || 0, livre);
+  setTimeout(tenta, Math.max(0, livre - Date.now()));
+}
 function posAcao(acao, r, jogada, antes) {
   const ui = S.ui;
   const combo = jogada && jogada.fisicas.length > 1 ? jogada : null;
   const sentidoAntes = antes.sentido, maosAntes = antes.maos, minhasAntes = antes.minhas;
   ui.aviso = descrever(acao, r); ui.erro = false;
   somDaAcao(acao, r, jogada, combo, antes);
+  // guarda as cartas desta jogada: um "Última!" apertado depois mostra elas (a última já com a cor escolhida)
+  if (jogada && (acao.tipo === 'jogar' || acao.tipo === 'corte')) {
+    ui.ultimasCartas = ui.ultimasCartas || {};
+    const n = jogada.fisicas.length;
+    ui.ultimasCartas[acao.jogador] = jogada.fisicas.map((c, k) => ({ src: k === n - 1 && (c.tipo === 'coringa' || c.tipo === '+5') && S.e.corAtual ? `${PASTA}/${baseCoringa(c)}-${S.e.corAtual}.webp?v=${VC}` : imgCarta(c) }));
+  } else if (acao.tipo !== 'ultima' && acao.jogador && ui.ultimasCartas) delete ui.ultimasCartas[acao.jogador];
   // Combo, Pular e Reverso: uma animação só; as cartas só vão para a pilha no fim dela
   let efeito = null;
   if (jogada && S.e.sentido !== sentidoAntes) efeito = { tipo: 'reverso', sentido: S.e.sentido };
@@ -1350,9 +1378,9 @@ function posAcao(acao, r, jogada, antes) {
   // Quem esquece não ganha animação nenhuma: o ESQUECEU! só aparece se alguém de fato pegar ("Pegou!").
   const avisouAgora = acao.tipo === 'ultima' && ator1 && ator1.mao.length === 1;
   if (avisouAgora) {
-    const atraso = Math.max(0, (ui.comboAte || 0) - Date.now());
-    setTimeout(() => { if (S.e) mostrarUltima(ator1.id, true); }, atraso);
-    ui.comboAte = Date.now() + atraso + DURACAO_ULTIMA;
+    // entra na fila: só depois que a jogada pousar e o palco dela fechar; mostra as cartas que ele jogou
+    const cartasU = ui.ultimasCartas && ui.ultimasCartas[ator1.id];
+    naFila(ui, () => mostrarUltima(ator1.id, true, null, DURACAO_ULTIMA + 300, cartasU ? { itens: cartasU, aoMonte: null } : (ator1.id === EU && minhaMao()[0] ? { itens: [{ src: imgCarta(minhaMao()[0]) }], aoMonte: null } : null)), DURACAO_ULTIMA + 300);
   }
   if (acao.jogador === EU && acao.tipo === 'comprar' && r.podeJogar) ui.aviso = r.serve ? 'A carta comprada serve: jogue qualquer carta ou passe' : 'Comprou: jogue qualquer carta que sirva ou passe';
   // compras: uma carta por vez saindo do monte até quem comprou
@@ -1375,8 +1403,9 @@ function posAcao(acao, r, jogada, antes) {
     for (const [id, d] of compras) {
       if (acao.tipo === 'pegou') { // ESQUECEU!: só quando alguém pega de verdade, junto com as 2 cartas
         const dur = Math.max(1700, duracaoCompra(d) + 500);
-        mostrarUltima(id, false, `${nomeJog(acao.jogador).replace('Bot ', '')} pegou! +${d} cartas`, dur);
-        ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + dur);
+        const sub = `${nomeJog(acao.jogador).replace('Bot ', '')} pegou! +${d} cartas`;
+        if (document.querySelector('.palco')) naFila(ui, () => mostrarUltima(id, false, sub, dur), dur);
+        else { mostrarUltima(id, false, sub, dur); ui.comboAte = Math.max(ui.comboAte || 0, Date.now() + dur); }
         continue;
       }
       const sub = acao.tipo === 'pegou' ? 'Não disse Última!' : acao.tipo === 'desafiar' ? (r.resultado === 'ilegal' ? `Desafio certo: o ${nomeMaisN()} era ilegal` : 'Desafio errado: +2 de castigo') : `Comprou ${d} ${d === 1 ? 'carta' : 'cartas'}`;

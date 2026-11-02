@@ -1161,9 +1161,13 @@ function renderModal() {
   }
   if (m.tipo === 'espiada') corpo = `<h2 style="font-size:24px">Mão de ${esc(nomeJog(m.alvo).replace('Bot ', ''))}</h2><div class="espiadas">${m.mao.map((c) => `<img src="${imgCarta(c)}" alt="${esc(nomeCarta(c))}">`).join('')}</div><button class="btn btn-principal" id="fechar">Fechar</button>`;
   if (m.tipo === 'sair') corpo = `<h2 style="font-size:24px">Sair da partida?</h2><p style="margin:0;color:var(--suave)">${S.online ? 'Um bot joga no seu lugar até o fim da mão e depois você sai da mesa.' : 'O placar desta partida será perdido.'}</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><button class="btn" id="fechar">Continuar jogando</button><button class="btn btn-perigo" id="confirmar-sair">Sair</button></div>`;
-  return `<div class="fundo-modal"><div class="modal" role="dialog" aria-modal="true">${corpo}</div></div>`;
+  // escolha da jogada (cor, Regra do 5, Zero): dá para voltar e escolher outra jogada
+  const voltar = ['cor', 'cor5', 'zero'].includes(m.tipo) ? '<button class="btn btn-voltar-jogada" id="voltar-jogada"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Voltar e escolher outra jogada</button>' : '';
+  return `<div class="fundo-modal"><div class="modal" role="dialog" aria-modal="true">${corpo}${voltar}</div></div>`;
 }
 function ligarModal() {
+  const vj = document.getElementById('voltar-jogada');
+  if (vj) vj.onclick = () => { S.ui.modal = null; render(); }; // a carta continua na mão (e o combo, se estava montando)
   const m = S.ui && S.ui.modal;
   if (!m) return;
   const fechar = () => { S.ui.modal = null; render(); };

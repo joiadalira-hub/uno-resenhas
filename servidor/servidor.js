@@ -49,6 +49,13 @@ const servidor = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   let caminho = decodeURIComponent(url.pathname);
   if (caminho === '/saude') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('ok'); }
+  if (caminho === '/erro' && req.method === 'POST') {
+    // erro vindo do celular de alguém: só registra no log (para achar bugs que só acontecem em alguns aparelhos)
+    let corpo = '';
+    req.on('data', (d) => { corpo += d; if (corpo.length > 4000) req.destroy(); });
+    req.on('end', () => { try { const e = JSON.parse(corpo); log('ERRO NO CELULAR', JSON.stringify(e).slice(0, 1800)); } catch { /* ignora */ } });
+    res.writeHead(204); return res.end();
+  }
   if (caminho === '/salas') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify(salasParaEntrar())); }
   const pedido = caminho;
   if (caminho === '/' || caminho.startsWith('/s/')) caminho = '/index.html';

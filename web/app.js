@@ -1267,7 +1267,46 @@ function naFila(ui, fn, dur) {
   ui.filaLivre = Math.max(ui.filaLivre || 0, livre);
   setTimeout(tenta, Math.max(0, livre - Date.now()));
 }
+// ---------- rede de segurança: erro numa animação nunca trava a mesa ----------
+let errosEnviados = 0;
+function reportarErro(err, onde) {
+  try {
+    console.error(onde, err);
+    if (errosEnviados >= 6 || !S.temServidor) return;
+    errosEnviados++;
+    const dados = { onde, msg: String((err && err.message) || err).slice(0, 300), pilha: String((err && err.stack) || '').slice(0, 1200), tela: S.tela, online: !!S.online, fase: S.e && S.e.fase, ua: navigator.userAgent.slice(0, 200), w: innerWidth, h: innerHeight, v: VC };
+    fetch('/erro', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(dados), keepalive: true }).catch(() => {});
+  } catch { /* nada */ }
+}
+window.addEventListener('error', (ev) => reportarErro(ev.error || ev.message, 'janela'));
+window.addEventListener('unhandledrejection', (ev) => reportarErro(ev.reason, 'promessa'));
 function posAcao(acao, r, jogada, antes) {
+  try { posAcaoAnimada(acao, r, jogada, antes); }
+  catch (err) {
+    reportarErro(err, 'animacao ' + (acao && acao.tipo));
+    document.querySelectorAll('.palco').forEach((x) => x.remove());
+    if (S.ui) { S.ui.topoSegurado = null; S.ui.maoSegurada = null; S.ui.saindo = null; S.ui.pendentes = null; S.ui.comboAte = Date.now() + 300; }
+    try { depoisDeMudar(); } catch (e2) { reportarErro(e2, 'depoisDeMudar'); }
+  }
+}
+// Vigia: mão acabou e a tela ainda não foi para a pontuação → vai sozinha; palco esquecido na tela → some
+setInterval(() => {
+  try {
+    const agora = Date.now();
+    document.querySelectorAll('.palco').forEach((p) => { if (!p.dataset.t) p.dataset.t = agora; else if (agora - p.dataset.t > 15000) { p.remove(); reportarErro('palco preso', 'vigia'); } });
+    if (!S.e || !S.ui || S.tela !== 'mesa') return;
+    if (S.e.fase === 'jogando') { S.ui.fimVistoEm = 0; return; }
+    if (!S.ui.fimVistoEm) { S.ui.fimVistoEm = agora; return; }
+    const limite = S.ui.fimVistoEm + Math.min(12000, Math.max(6000, (S.ui.comboAte || 0) - S.ui.fimVistoEm + 4500));
+    if (agora < limite) return;
+    reportarErro('vitória não apareceu', 'vigia');
+    S.ui.fimVistoEm = 0;
+    document.querySelectorAll('.palco, .vitoria-show').forEach((x) => x.remove());
+    S.ui.vitoria = true; S.ui.modal = null;
+    S.tela = 'fim'; render();
+  } catch (err) { /* o vigia nunca derruba nada */ }
+}, 1000);
+function posAcaoAnimada(acao, r, jogada, antes) {
   const ui = S.ui;
   const combo = jogada && jogada.fisicas.length > 1 ? jogada : null;
   const sentidoAntes = antes.sentido, maosAntes = antes.maos, minhasAntes = antes.minhas;

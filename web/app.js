@@ -2052,20 +2052,39 @@ function votosAtuais() {
 }
 function htmlVotos() {
   const votos = votosAtuais();
-  const chegando = S.online && S.online.sala ? S.online.sala.assentos.filter((a) => a.pendente) : [];
-  return S.e.jogadores.map((j) => {
+  const sala = S.online && S.online.sala;
+  const dono = souDonoDaSala();
+  const idx = (id) => (sala ? sala.assentos.findIndex((a) => a.id === id) : -1);
+  const acao = (id, txt) => (sala && dono && idx(id) >= 0 ? `<button type="button" class="voto-acao" data-alternar="${idx(id)}">${txt}</button>` : '');
+  const chegando = sala ? sala.assentos.filter((a) => a.pendente && a.tipo !== 'aberto') : [];
+  const vagos = sala ? sala.assentos.filter((a) => a.tipo === 'aberto') : [];
+  const lista = S.e.jogadores.map((j) => {
     const v = votos[j.id];
     const nome = j.id === EU ? 'Você' : j.nome.replace('Bot ', '');
+    const as = sala && sala.assentos.find((a) => a.id === j.id);
+    const ehBot = as ? as.tipo === 'bot' : j.bot;
     return `<span class="voto-lin ${v === true ? 'sim' : v === false ? 'nao' : ''}" style="--cor-jog:${corDoJogador(j.id)}">
       <span class="avatar mini-av">${htmlAvatar(j.id === EU ? { id: EU, nome: S.apelido || 'Você' } : j)}</span>
-      <b>${esc(nome)}</b><span class="voto-est">${v === true ? 'Sim ✓' : v === false ? 'Não · sai' : 'pensando…'}</span></span>`;
+      <b>${esc(nome)}</b><span class="voto-est">${v === true ? 'Sim ✓' : v === false ? 'Não · sai' : 'pensando…'}</span>${ehBot ? acao(j.id, as && as.sai ? 'Manter bot' : 'Tirar bot') : ''}</span>`;
   }).join('') + chegando.map((a) => `<span class="voto-lin sim" style="--cor-jog:var(--humano)">
       <span class="avatar mini-av">${a.avatar ? `<img class="figurinha" src="${a.avatar}" alt="">` : `<span class="inicial">${esc(a.nome.replace('Bot ', '')[0].toUpperCase())}</span>`}</span>
-      <b>${esc(a.nome.replace('Bot ', ''))}</b><span class="voto-est">chegando ✓</span></span>`).join('');
+      <b>${esc(a.nome.replace('Bot ', ''))}</b><span class="voto-est">chegando ✓</span>${a.tipo === 'bot' ? acao(a.id, 'Tirar bot') : ''}</span>`).join('')
+    + vagos.map((a) => `<span class="voto-lin vago">
+      <span class="avatar mini-av"><span class="inicial">+</span></span>
+      <b>Lugar vago</b><span class="voto-est">esperando um amigo</span>${acao(a.id, 'Pôr bot')}</span>`).join('');
+  return lista + (dono ? htmlBotoesLugar(sala) : '');
 }
 function atualizarVotos() {
   const el = document.getElementById('votos');
-  if (el) el.innerHTML = htmlVotos();
+  if (el) { el.innerHTML = htmlVotos(); ligarVotos(); }
+  // apareceu (ou sumiu) um lugar vago: o convite aparece junto
+  const temConvite = !!document.querySelector('.convite-fim');
+  const sala = S.online && S.online.sala;
+  if (sala && S.e && !S.e.opcoes.salaAberta && temConvite !== sala.assentos.some((a) => a.tipo === 'aberto')) { const t = app.querySelector('.tela'); const y = t ? t.scrollTop : 0; telaFim(); const t2 = app.querySelector('.tela'); if (t2) t2.scrollTop = y; }
+}
+function ligarVotos() {
+  document.querySelectorAll('#votos [data-alternar]').forEach((b) => (b.onclick = () => enviar({ tipo: 'lugar', indice: Number(b.dataset.alternar) })));
+  ligarBotoesLugar();
 }
 function telaFim() {
   const e = S.e, r = e.resultadoRodada, acabou = e.fase === 'fim_partida';
@@ -2090,7 +2109,7 @@ function telaFim() {
     </div>
     <div class="tabela"><div class="lin cab"><span>Pos.</span><span>Jogador</span><span class="dir">Na mão</span><span class="dir">Ganhou</span></div>${linhas}</div>
     <div class="tabela"><div class="lin cab ${aberta ? 'cinco' : ''}"><span></span><span>Placar geral</span><span class="dir">Vitórias</span>${aberta ? '<span class="dir">Mãos</span>' : ''}<span class="dir">Pontos</span></div>${geral}</div>
-    ${aberta && S.online && S.online.sala ? htmlConvite(S.online.sala) : ''}
+    ${S.online && S.online.sala && (aberta || S.online.sala.assentos.some((a) => a.tipo === 'aberto')) ? htmlConvite(S.online.sala) : ''}
     <section class="bloco votacao">
       <span class="rotulo">${acabou ? 'Jogar outra partida?' : aberta ? 'Jogar a próxima mão?' : 'Jogar a próxima rodada?'}</span>
       ${votou
@@ -2110,6 +2129,7 @@ function telaFim() {
   </main>`;
   const $ = (id) => document.getElementById(id);
   ligarConvite();
+  ligarVotos();
   if ($('config-sala')) $('config-sala').onclick = abrirConfigSala;
   if ($('voto-sim')) $('voto-sim').onclick = () => { ui.voto = true; telaFim(); };
   if ($('voto-nao')) $('voto-nao').onclick = () => { ui.voto = false; telaFim(); };
@@ -2151,6 +2171,23 @@ function ligarConvite() {
     if (navigator.share) { try { await navigator.share({ title: 'Uno Resenhas', text: texto }); return; } catch (err) { if (err && err.name === 'AbortError') return; } }
     try { await navigator.clipboard.writeText(texto); comp.textContent = 'Convite copiado!'; } catch { comp.textContent = 'Use o Copiar'; }
   };
+}
+// ---------- lugares: o dono abre um lugar vago (para um amigo entrar pelo link) ou fecha um ----------
+function htmlBotoesLugar(sala) {
+  const naMesa = sala ? sala.assentos.filter((a) => !a.sai).length : (S.e ? S.e.jogadores.length : 0);
+  const vagos = sala ? sala.assentos.filter((a) => a.tipo === 'aberto').length : 0;
+  const bots = S.e && !sala ? S.e.jogadores.filter((j) => j.bot).length : 0;
+  const podeTirar = sala ? vagos > 0 : bots > 0 && naMesa > 2;
+  return `<div class="botoes-lugar">
+    <button type="button" class="btn" id="lugar-mais" ${naMesa >= 10 ? 'disabled' : ''}><b aria-hidden="true">+</b> ${sala ? 'Adicionar lugar' : 'Adicionar bot'}</button>
+    <button type="button" class="btn" id="lugar-menos" ${podeTirar ? '' : 'disabled'}><b aria-hidden="true">−</b> ${sala ? 'Remover lugar' : 'Tirar bot'}</button>
+  </div>${sala ? `<p class="ajuda" style="margin:-4px 0 0;text-align:center">${naMesa}/10 na mesa${sala.fase !== 'espera' ? ' · quem entrar pelo link senta na próxima mão' : ''}</p>` : ''}`;
+}
+function ligarBotoesLugar() {
+  const mais = document.getElementById('lugar-mais'), menos = document.getElementById('lugar-menos');
+  const sala = S.online && S.online.sala;
+  if (mais) mais.onclick = () => (sala ? enviar({ tipo: 'lugares', delta: 1 }) : mudarBots(1));
+  if (menos) menos.onclick = () => (sala ? enviar({ tipo: 'lugares', delta: -1 }) : mudarBots(-1));
 }
 // ---------- bots na mesa: o dono põe ou tira (sentam / saem na próxima mão) ----------
 function contagemMesa() {
@@ -2838,6 +2875,7 @@ function telaEspera() {
           <b>${a.id === sala.dono ? 'DONO' : a.tipo === 'bot' ? (souDono ? 'Tirar bot' : 'BOT') : a.conectado ? '' : 'caiu'}</b></button>`;
       }).join('')}
     </div>
+    ${souDono ? htmlBotoesLugar(sala) : ''}
     ${S.avisoRecriada ? '<p class="aviso" style="height:auto;white-space:normal;color:var(--destaque)">A sala foi recriada depois que o servidor reiniciou. O placar anterior se perdeu.</p>' : ''}
     <p class="aviso erro" id="erro-espera" role="alert" style="height:auto;white-space:normal"></p>
     ${souDono
@@ -2854,6 +2892,7 @@ function telaEspera() {
     catch { const r = document.createRange(); r.selectNodeContents(document.getElementById('link-sala')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = 'Selecionado'; }
   };
   app.querySelectorAll('[data-alternar]').forEach((b) => (b.onclick = () => enviar({ tipo: 'lugar', indice: Number(b.dataset.alternar) })));
+  ligarBotoesLugar();
   if (document.getElementById('config-sala')) document.getElementById('config-sala').onclick = abrirConfigSala;
   const cm = document.getElementById('comecar-online');
   if (cm) cm.onclick = () => { cm.disabled = true; enviar({ tipo: 'comecar' }); };
@@ -2868,7 +2907,7 @@ function telaProximaMao(sala, link) {
       <button class="btn btn-icone" id="sair-espera" aria-label="Sair da sala"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div style="display:flex;flex-direction:column;min-width:0">
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
-        <span class="ajuda" style="font-size:13px">Sala aberta ${esc(sala.codigo)}${o.caiu ? ' · reconectando…' : ''}</span>
+        <span class="ajuda" style="font-size:13px">${sala.config && sala.config.salaAberta ? 'Sala aberta' : 'Sala'} ${esc(sala.codigo)}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
       <span style="margin-left:auto;display:flex;gap:6px">${botaoSom()}${botaoTelaCheia()}</span>
     </div>

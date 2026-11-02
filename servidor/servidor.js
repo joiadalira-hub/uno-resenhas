@@ -81,6 +81,7 @@ function salasParaEntrar() {
     let pode = false;
     if (sala.fase === 'espera') pode = sala.assentos.some((a) => a.tipo === 'aberto') || (sala.config.salaAberta && sala.assentos.length < sala.capacidade);
     else if (sala.fase === 'jogando' && sala.config.salaAberta) pode = humanos < sala.capacidade;
+    else if (sala.fase === 'jogando') pode = sala.assentos.some((a) => a.tipo === 'aberto');
     if (!pode) continue;
     lista.push({ codigo: sala.codigo, nome: sala.nome, temSenha: !!sala.senha, aberta: sala.config.salaAberta, jogando: sala.fase === 'jogando', ocupados, lugares: sala.config.salaAberta ? sala.capacidade : sala.assentos.length, modo: sala.config.fimModo, cores: sala.config.opcoes.cores || 5 });
   }
@@ -217,6 +218,14 @@ class Sala {
   }
   // Sala aberta: alguém chega no meio da mão e espera a próxima
   chegou(msg, conexao) {
+    const vago = this.assentos.findIndex((a) => a.tipo === 'aberto');
+    if (vago >= 0) {
+      const novo = { ...this.novoHumano(msg, conexao), pendente: true };
+      this.assentos[vago] = novo;
+      log('chegou para a próxima mão', this.codigo, novo.nome);
+      return novo;
+    }
+    if (!this.config.salaAberta) return null;
     if (this.assentos.filter((a) => !a.saiu && !a.sai).length >= Math.max(this.capacidade, 2)) {
       const bot = this.assentos.find((a) => a.tipo === 'bot' && !a.sai);
       if (!bot) return null;
@@ -240,9 +249,9 @@ class Sala {
     const saem = e.jogadores.filter((j) => this.votos[j.id] === false).map((j) => j.id);
     this.votos = null;
     const ficam = this.assentos.filter((a) => !saem.includes(a.id));
-    const chegam = ficam.filter((a) => a.pendente);
+    const chegam = ficam.filter((a) => a.pendente && a.tipo !== 'aberto');
     // sem 2 jogadores, ou sem nenhuma pessoa de verdade, a partida acaba aqui
-    if (ficam.length < 2 || !ficam.some((a) => a.tipo === 'humano' && !a.saiu)) {
+    if (ficam.filter((a) => a.tipo !== 'aberto').length < 2 || !ficam.some((a) => a.tipo === 'humano' && !a.saiu)) {
       this.assentos = ficam.length ? ficam : this.assentos;
       return this.finalizar();
     }
@@ -447,7 +456,7 @@ function tratar(conexao, msg, ctx) {
       ctx.sala = sala; ctx.assento = antigo;
     } else {
       if (sala.senha && msg.senha !== sala.senha) return erro(conexao, 'Senha errada.');
-      if (sala.fase === 'jogando' && sala.config.salaAberta) {
+      if (sala.fase === 'jogando' && (sala.config.salaAberta || sala.assentos.some((a) => a.tipo === 'aberto'))) {
         const novo = sala.chegou(msg, conexao);
         if (!novo) return erro(conexao, 'A sala está cheia.');
         ctx.sala = sala; ctx.assento = novo;
@@ -469,11 +478,39 @@ function tratar(conexao, msg, ctx) {
   const { sala, assento } = ctx;
   if (!sala || !assento) return erro(conexao, 'Entre em uma sala primeiro.');
 
-  if (tipo === 'lugar') { // o dono alterna um lugar vago entre Aberto e Bot
-    if (assento.id !== sala.dono || sala.fase !== 'espera') return;
+  const entreMaosAgora = () => sala.fase === 'jogando' && sala.e && sala.e.fase !== 'jogando';
+  const ativosMesa = () => sala.assentos.filter((a) => a.tipo !== 'aberto' && !a.sai && !a.saiu);
+  if (tipo === 'lugar') { // o dono alterna um lugar entre Aberto e Bot (na espera ou entre as mãos)
+    if (assento.id !== sala.dono) return;
     const a = sala.assentos[msg.indice];
     if (!a || a.tipo === 'humano') return;
-    sala.assentos[msg.indice] = a.tipo === 'bot' ? { tipo: 'aberto', id: `a${sala.seq++}` } : sala.novoBot(msg.indice);
+    if (sala.fase === 'espera') sala.assentos[msg.indice] = a.tipo === 'bot' ? { tipo: 'aberto', id: `a${sala.seq++}` } : sala.novoBot(msg.indice);
+    else if (entreMaosAgora()) {
+      if (a.tipo === 'aberto') sala.assentos[msg.indice] = { ...sala.novoBot(msg.indice), pendente: true };
+      else if (a.pendente) sala.assentos[msg.indice] = { tipo: 'aberto', id: `a${sala.seq++}`, pendente: true };
+      else if (a.sai) { a.sai = false; if (sala.votos) sala.votos[a.id] = true; } // o bot fica
+      else {
+        if (ativosMesa().length <= 2) return erro(conexao, 'A mesa precisa de pelo menos 2 jogadores.');
+        a.sai = true; if (sala.votos) sala.votos[a.id] = false; // sai quando a mão acabar
+      }
+    } else return erro(conexao, 'Espere a mão acabar para mexer nos lugares.');
+    sala.capacidade = Math.max(sala.capacidade, ativosMesa().length);
+    return sala.enviarSala();
+  }
+  // O dono abre (ou fecha) um lugar vago para um amigo entrar pelo link
+  if (tipo === 'lugares') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala mexe nos lugares.');
+    if (sala.fase !== 'espera' && !entreMaosAgora()) return erro(conexao, 'Espere a mão acabar para mexer nos lugares.');
+    const naMesa = sala.assentos.filter((a) => !a.sai && !a.saiu).length;
+    if (msg.delta > 0) {
+      if (naMesa >= 10) return erro(conexao, 'A mesa já tem 10 lugares.');
+      sala.assentos.push({ tipo: 'aberto', id: `a${sala.seq++}`, pendente: sala.fase !== 'espera' });
+    } else {
+      let i = -1; sala.assentos.forEach((a, k) => { if (a.tipo === 'aberto') i = k; });
+      if (i < 0) return erro(conexao, 'Não há lugar vago para tirar.');
+      sala.assentos.splice(i, 1);
+    }
+    sala.capacidade = Math.max(sala.capacidade, Math.min(10, sala.assentos.filter((a) => !a.sai && !a.saiu).length));
     return sala.enviarSala();
   }
   if (tipo === 'comecar') {
@@ -533,7 +570,7 @@ function tratar(conexao, msg, ctx) {
         else if (sala.assentos.length < 10) sala.assentos.push(sala.novoBot(sala.assentos.length));
         else return erro(conexao, 'A mesa já tem 10 lugares.');
       } else {
-        if (ativos().length >= 10) return erro(conexao, 'A mesa já tem 10 lugares.');
+        if (sala.assentos.filter((a) => !a.sai && !a.saiu).length >= 10) return erro(conexao, 'A mesa já tem 10 lugares.');
         sala.assentos.push({ ...sala.novoBot(sala.assentos.length), pendente: true });
       }
     } else if (msg.delta < 0) {

@@ -135,6 +135,7 @@ class Sala {
     this.e = null;
     this.fase = 'espera';
     this.timers = [];
+    this.timers9 = []; this.noveDe = null;
     this.espectadores = []; // quem só assiste a partida (não joga, não vota)
     this.prazoAte = 0;
     this.vazioDesde = 0;
@@ -171,6 +172,7 @@ class Sala {
     if (this.e) for (const v of this.espectadores) v.conexao.enviar({ tipo: 'estado', meuId: v.id, visao: visaoDe(this.e, v.id), evento: evento ? privado(evento, v.id) : null, prazo: 0 });
   }
   limparTimers() { this.timers.forEach(clearTimeout); this.timers = []; this.prazoAte = 0; }
+  limparNove() { (this.timers9 || []).forEach(clearTimeout); this.timers9 = []; this.noveDe = null; }
   depois(ms, fn) { this.timers.push(setTimeout(() => { try { fn(); } catch (err) { log('erro no timer', this.codigo, err.message); } }, ms)); }
 
   comecar() {
@@ -288,6 +290,7 @@ class Sala {
   finalizar() {
     clearTimeout(this.timerVotos);
     this.limparTimers();
+    this.limparNove();
     this.votos = null;
     this.fase = 'final';
     this.enviarSala();
@@ -352,14 +355,22 @@ class Sala {
     const espera = this.esperaAnimacao(evento);
     this.animaAte = Date.now() + espera; // até aqui ninguém joga (a animação ainda roda nos celulares)
     if (e.regra9) {
-      for (const j of e.jogadores) if (j.bot && !e.regra9.apertaram.includes(j.id)) {
-        // quem soltou o 9 quase sempre aperta primeiro (só 5% das vezes demora)
-        const rapido = j.id === e.regra9.por && randomInt(100) >= 5;
-        this.depois(espera + (rapido ? 150 + randomInt(300) : 450 + randomInt(2200)), () => { if (this.e.regra9 && !this.e.regra9.apertaram.includes(j.id)) this.agir({ tipo: 'apertar9', jogador: j.id }, j.id); });
+      // Regra do 9: os tempos dos bots e o prazo são sorteados UMA vez, quando o (9) abre
+      // (antes, cada aperto sorteava tudo de novo e a rodada do 9 se arrastava em mesa cheia de bots)
+      if (this.noveDe !== e.regra9) {
+        this.limparNove();
+        this.noveDe = e.regra9;
+        const nove = (ms, fn) => this.timers9.push(setTimeout(() => { try { fn(); } catch (err) { log('erro no timer', this.codigo, err.message); } }, ms));
+        for (const j of e.jogadores) if (j.bot && !e.regra9.apertaram.includes(j.id)) {
+          // quem soltou o 9 quase sempre aperta primeiro (só 5% das vezes demora)
+          const rapido = j.id === e.regra9.por && randomInt(100) >= 5;
+          nove(espera + (rapido ? 150 + randomInt(300) : 450 + randomInt(2200)), () => { if (this.e.regra9 === this.noveDe && !this.e.regra9.apertaram.includes(j.id)) this.agir({ tipo: 'apertar9', jogador: j.id }, j.id); });
+        }
+        nove(espera + 6000, () => { if (this.e.regra9 && this.e.regra9 === this.noveDe) this.agir({ tipo: 'tempo9' }, 'servidor'); });
       }
-      this.depois(espera + 6000, () => { if (this.e.regra9) this.agir({ tipo: 'tempo9' }, 'servidor'); });
       return;
     }
+    if (this.noveDe) this.limparNove();
     // bot pega quem esqueceu de dizer "Última!"
     const vul = e.vulneravel && e.jogadores.find((j) => j.id === e.vulneravel);
     const algumBot = vul && e.jogadores.find((j) => j.bot && j.id !== vul.id);
@@ -680,7 +691,7 @@ setInterval(() => {
     const alguem = sala.humanos().some((h) => h.conectado);
     if (alguem) { sala.vazioDesde = 0; continue; }
     if (!sala.vazioDesde) sala.vazioDesde = agora;
-    else if (agora - sala.vazioDesde > 30 * 60 * 1000) { sala.limparTimers(); salas.delete(codigo); log('sala apagada', codigo); }
+    else if (agora - sala.vazioDesde > 30 * 60 * 1000) { sala.limparTimers(); sala.limparNove(); salas.delete(codigo); log('sala apagada', codigo); }
   }
 }, 60 * 1000).unref();
 

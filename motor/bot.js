@@ -32,7 +32,7 @@ export function escolherAcao(e, idBot) {
   }
   const melhor = possiveis.reduce((a, b) => (nota(e, j, b) > nota(e, j, a) ? b : a));
   const resto = j.mao.filter((c) => !melhor.ids.includes(c.id));
-  const acao = { tipo: 'jogar', jogador: idBot, cartas: melhor.ids, cor: corPreferida(resto, coresDoModo(e.opcoes.cores || 5)), ultima: resto.length === 1 };
+  const acao = { tipo: 'jogar', jogador: idBot, cartas: melhor.ids, cor: corPreferida(resto, coresDoModo(e.opcoes.cores || 5)), ultima: resto.length === 1 && Math.random() >= 0.25 }; // 25% das vezes o bot esquece de dizer Última!
   const ult = melhor.efetivas[melhor.efetivas.length - 1];
   if (ult.tipo === 'num' && ult.valor === 0) {
     const outros = e.jogadores.filter((x) => x.id !== idBot);

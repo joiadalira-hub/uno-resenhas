@@ -353,13 +353,18 @@ class Sala {
     }
     // bot pega quem esqueceu de dizer "Última!"
     const vul = e.vulneravel && e.jogadores.find((j) => j.id === e.vulneravel);
-    const algumBot = e.jogadores.find((j) => j.bot);
-    if (vul && !vul.bot && algumBot) this.depois(espera + 2600, () => {
-      if (this.e.vulneravel === vul.id && Math.random() < 0.75) this.agir({ tipo: 'pegou', jogador: algumBot.id, alvo: vul.id }, algumBot.id);
-    });
+    const algumBot = vul && e.jogadores.find((j) => j.bot && j.id !== vul.id);
+    if (vul && algumBot) {
+      // pessoa que esqueceu: 75% de chance de um bot pegar; bot que esqueceu: os outros bots pegam 50% das vezes
+      // (um pouco antes da próxima jogada, mas deixando tempo para as pessoas apertarem Pegou! primeiro)
+      const [tempo, chance] = vul.bot ? [1500, 0.5] : [2600, 0.75];
+      this.depois(espera + tempo, () => {
+        if (this.e.vulneravel === vul.id && Math.random() < chance) this.agir({ tipo: 'pegou', jogador: algumBot.id, alvo: vul.id }, algumBot.id);
+      });
+    }
     const atual = e.jogadores[e.vez];
     if (atual.bot) {
-      this.depois(Math.max(1900, espera + 700), () => { const a = escolherAcao(this.e, atual.id); this.agir(a, atual.id); });
+      this.depois(Math.max(1900, espera + 700, vul && vul.bot ? espera + 1900 : 0), () => { const a = escolherAcao(this.e, atual.id); this.agir(a, atual.id); });
     } else if (semSaida(e, atual.id)) {
       // nada para jogar (sem resposta ao +2/+N e sem desafio, ou vez normal sem carta que sirva): compra sozinho
       this.depois(espera + 900, () => { if (this.e.jogadores[this.e.vez].id === atual.id && semSaida(this.e, atual.id)) this.agir({ tipo: 'comprar', jogador: atual.id }, 'automatico'); });

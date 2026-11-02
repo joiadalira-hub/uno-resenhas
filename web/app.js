@@ -2024,12 +2024,12 @@ function depoisDeMudar() {
 
   if (S.online) return depoisDeMudarOnline(esperaCombo);
   // bot pega quem esqueceu de dizer "Última!"
-  if (e.vulneravel === EU) timerPegou = setTimeout(() => {
-    if (S.e && S.e.vulneravel === EU && Math.random() < 0.75) {
-      const bot = S.e.jogadores.find((j) => j.bot);
-      agir({ tipo: 'pegou', jogador: bot.id, alvo: EU });
-    }
-  }, 2600 + esperaCombo);
+  // (bot que esqueceu: os outros bots pegam 50% das vezes, deixando um tempinho para você apertar Pegou! primeiro)
+  const vul = e.vulneravel && e.jogadores.find((j) => j.id === e.vulneravel);
+  const pegador = vul && e.jogadores.find((j) => j.bot && j.id !== vul.id);
+  if (vul && pegador) timerPegou = setTimeout(() => {
+    if (S.e && S.e.vulneravel === vul.id && Math.random() < (vul.bot ? 0.5 : 0.75)) agir({ tipo: 'pegou', jogador: pegador.id, alvo: vul.id });
+  }, (vul.bot ? 1500 : 2600) + esperaCombo);
 
   // Regra do 9: enquanto o (9) está aberto, ninguém joga; os bots apertam com reflexos diferentes
   prepararNove(esperaCombo);
@@ -2055,7 +2055,7 @@ function depoisDeMudar() {
   if (atual.bot) {
     ui.prazo = 0;
     const vaiBot = () => { if (emAnimacao()) { timerBot = setTimeout(vaiBot, S.ui.comboAte - Date.now() + 500); return; } agir(escolherAcao(S.e, atual.id)); };
-    timerBot = setTimeout(vaiBot, Math.max(animando ? (topo.tipo === 'ctrl' ? 3000 : 2600) : 1900, esperaCombo + 700));
+    timerBot = setTimeout(vaiBot, Math.max(animando ? (topo.tipo === 'ctrl' ? 3000 : 2600) : 1900, esperaCombo + 700, vul && vul.bot ? esperaCombo + 1900 : 0)); // dá tempo de alguém pegar o bot que esqueceu
   } else if (semJogada(e)) {
     // nada para jogar (nem resposta ao +2/+N, nem desafio): compra sozinho
     ui.prazo = 0;

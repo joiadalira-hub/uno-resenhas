@@ -443,7 +443,8 @@ function nomeCarta(c) {
   return `${cor} ${{ pular: 'Pular', reverso: 'Reverso', '+2': '+2' }[c.tipo]}`;
 }
 const nomeJog = (id) => (id === EU ? 'Você' : S.e.jogadores.find((j) => j.id === id)?.nome ?? '?');
-const minhaMao = () => S.e.jogadores.find((j) => j.id === EU).mao;
+const minhaMao = () => (S.e.jogadores.find((j) => j.id === EU) || { mao: [] }).mao;
+const assistindo = () => !!(S.online && S.online.espectador);
 const minhaVez = () => S.e.fase === 'jogando' && S.e.jogadores[S.e.vez].id === EU;
 // Na minha vez sem nada para jogar (o jogo compra sozinho). Com carta que serve, comprar continua sendo escolha minha.
 const semJogada = (e) => !e.regra9 && !e.comprou && !(e.compraPendente && e.ultimoMais5) && jogadasPossiveis(e, EU).length === 0;
@@ -459,8 +460,8 @@ function htmlSalasAbertas() {
   const modo = (m) => ({ vitorias: 'vitórias', sem_fim: 'sem fim', rodadas: 'rodadas', pontos: 'pontos' }[m] || m);
   return `<span class="rotulo">Salas para entrar</span>` + l.map((x) => `<button type="button" class="sala-item" data-sala="${esc(x.codigo)}">
       <span class="sala-nome">${x.temSenha ? '🔒 ' : ''}${esc(x.nome)}</span>
-      <span class="sala-info">${x.aberta ? 'Sala aberta' : 'Esperando começar'}${x.jogando ? ' · jogando agora' : ''} · ${modo(x.modo)} · ${(MODOS.find((m) => m[0] === (x.cores || 5)) || MODOS[1])[1]}</span>
-      <b>${x.ocupados}/${x.lugares}</b></button>`).join('');
+      <span class="sala-info">${x.soAssistir ? 'Jogando agora · dá para assistir' : `${x.aberta ? 'Sala aberta' : 'Esperando começar'}${x.jogando ? ' · jogando agora' : ''}`} · ${modo(x.modo)} · ${(MODOS.find((m) => m[0] === (x.cores || 5)) || MODOS[1])[1]}</span>
+      <b>${x.soAssistir ? '👁 Assistir' : `${x.ocupados}/${x.lugares}`}</b></button>`).join('');
 }
 function ligarSalasAbertas() {
   app.querySelectorAll('[data-sala]').forEach((b) => (b.onclick = () => {
@@ -896,7 +897,7 @@ function prepararNove(esperaCombo) {
   setTimeout(() => {
     if (S.ui !== ui || !S.e || !S.e.regra9) return;
     if (S.tela === 'mesa') render();
-    if (!S.e.regra9.apertaram.includes(EU)) flashNove();
+    if (!S.e.regra9.apertaram.includes(EU) && !assistindo()) flashNove();
   }, ui.noveAbre - Date.now());
 }
 function flashNove() {
@@ -959,7 +960,9 @@ function telaMesa() {
   const fixo = S.layoutMesa && S.layoutMesa.chave === chaveLayout ? S.layoutMesa : null;
   const assentos = (fixo ? fixo.pos : posicoesAssentos(rivais.length)).map((pos, k) => ({ j: rivais[k], ...pos }));
   const jogando = e.fase === 'jogando'; // a mão acabou (alguém bateu): nenhum botão de jogada fica ativo
-  const vulneravelRival = jogando && e.vulneravel && e.vulneravel !== EU ? e.vulneravel : null;
+  const vulneravelRival = jogando && !assistindo() && e.vulneravel && e.vulneravel !== EU ? e.vulneravel : null;
+  const vendo = assistindo();
+  const qtosAssistem = (S.online && S.online.sala && S.online.sala.assistindo) || [];
 
   const fichas = ui.seq.length
     ? resolverSequencia(e, ui.seq.map((id) => mao.find((c) => c.id === id))).map((ef, i) => {
@@ -1005,9 +1008,10 @@ function telaMesa() {
         <span class="pilula">${v.monte} no monte</span>
         ${v.cartaDoTopo.tipo === 'ctrl' ? `<span class="pilula">Ctrl+C virou ${esc(nomeCarta(v.topo))}</span>` : ''}
         ${v.compraPendente ? `<span class="pilula compra">Compra acumulada: ${v.compraPendente.quantidade}</span>` : ''}
+        ${!vendo && qtosAssistem.length ? `<span class="pilula" title="${esc(qtosAssistem.join(', '))}">👁 ${qtosAssistem.length}</span>` : ''}
   <button type="button" class="btn-ordem" id="ordem" aria-haspopup="dialog" aria-label="Organizar a mão: ${esc(ORDENS.find((o) => o[0] === S.ordem)[1])}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>${esc(ORDENS.find((o) => o[0] === S.ordem)[2])}</button>
       </div>
-    ${v.regra9 && noveAberto() ? (() => {
+    ${v.regra9 && noveAberto() && !vendo ? (() => {
       const jaApertei = v.regra9.apertaram.includes(EU);
       const q = v.regra9.quantidade;
       const passou = Math.min(PRAZO9, Date.now() - ui.noveAbre);
@@ -1016,6 +1020,9 @@ function telaMesa() {
     })() : ''}
       ${vulneravelRival ? `<button class="btn btn-perigo pegou-flutua" id="pegou">Pegou! <small>${esc(nomeJog(vulneravelRival).replace('Bot ', ''))} não disse Última</small></button>` : ''}
     </div>
+    ${vendo ? `<p class="aviso" role="status">${esc(ui.aviso)}</p>
+    <div class="barra-assistindo"><span class="ao-vivo"><i aria-hidden="true"></i>Assistindo</span><span class="ajuda">Você vê a mesa e as jogadas, sem ver a mão de ninguém${qtosAssistem.length > 1 ? ` · ${qtosAssistem.length} assistindo` : ''}</span><button class="btn" id="parar-assistir">Sair</button></div>
+  </main>` : `
     <div class="mao-zona">
       ${ui.combo ? `<div class="painel-combo">
         <div class="linha"><span style="font:800 16px var(--display);color:var(--destaque)">Montando combo</span>${seqValida && !seqValida.ok ? `<span class="ajuda" style="color:#FF8A82">${esc(seqValida.mensagem)}</span>` : ''}</div>
@@ -1047,7 +1054,7 @@ function telaMesa() {
         <button class="btn ${jogando && mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${jogando && minhaMao().length <= 2 && minhaMao().length > 0 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}
       </div>
     </div>
-  </main>
+  </main>`}
   ${renderModal()}`;
   // primeira vez neste tamanho de tela: mede a mesa desenhada (antes de pintar) e congela tamanho e lugares
   if (!fixo) {
@@ -1078,7 +1085,9 @@ function telaMesa() {
 
 function ligarMesa() {
   const $ = (id) => document.getElementById(id);
-  $('sair').onclick = () => abrirModal({ tipo: 'sair' });
+  $('sair').onclick = () => (assistindo() ? sairDaSala() : abrirModal({ tipo: 'sair' }));
+  if ($('parar-assistir')) $('parar-assistir').onclick = sairDaSala;
+  if (assistindo()) { if ($('ordem')) $('ordem').remove(); ligarBotaoSom(); ligarZoom(); return; }
   if ($('monte')) $('monte').onclick = () => agir({ tipo: 'comprar', jogador: EU });
   if ($('comprar')) $('comprar').onclick = () => agir({ tipo: 'comprar', jogador: EU });
   if ($('passar')) $('passar').onclick = () => agir({ tipo: 'passar', jogador: EU });
@@ -2170,7 +2179,7 @@ function telaFim() {
     <div class="tabela"><div class="lin cab ${aberta ? 'cinco' : ''}"><span></span><span>Placar geral</span><span class="dir">Vitórias</span>${aberta ? '<span class="dir">Mãos</span>' : ''}<span class="dir">Pontos</span></div>${geral}</div>
     <section class="bloco votacao">
       <span class="rotulo">${acabou ? 'Jogar outra partida?' : aberta ? 'Jogar a próxima mão?' : 'Jogar a próxima rodada?'}</span>
-      ${votou
+      ${assistindo() ? '<p class="voto-feito">Você está assistindo: quem está na mesa decide se continua.</p>' : votou
         ? `<p class="voto-feito">Você votou <b>${ui.votoEnviado ? 'Sim' : 'Não'}</b>. Esperando os outros…</p>`
         : `<div class="segmentos voto-seg">
             <button type="button" id="voto-sim" aria-pressed="${ui.voto === true}">Sim</button>
@@ -2184,6 +2193,7 @@ function telaFim() {
     <div class="fim-botoes">
       ${dono ? `<button class="btn" id="config-sala">⚙ Regras da sala</button><button class="btn" id="finalizar">Finalizar partida</button>` : ''}
       ${acabou && !dono ? `<button class="btn" id="ver-arte">Arte do placar</button>` : ''}
+      ${assistindo() ? '<button class="btn" id="parar-assistir">Parar de assistir</button>' : ''}
     </div>
   </main>`;
   const $ = (id) => document.getElementById(id);
@@ -2193,6 +2203,7 @@ function telaFim() {
   if ($('voto-sim')) $('voto-sim').onclick = () => { ui.voto = true; telaFim(); };
   if ($('voto-nao')) $('voto-nao').onclick = () => { ui.voto = false; telaFim(); };
   if ($('ok-voto')) $('ok-voto').onclick = () => confirmarVoto(ui.voto);
+  if ($('parar-assistir')) $('parar-assistir').onclick = sairDaSala;
   if ($('ver-arte')) $('ver-arte').onclick = () => { S.arteDe = 'fim'; S.tela = 'arte'; render(); };
   if ($('finalizar')) $('finalizar').onclick = () => {
     if (S.online) { $('finalizar').disabled = true; enviar({ tipo: 'finalizar' }); return; }
@@ -2652,7 +2663,7 @@ function conectar(aoAbrir) {
   ws.onopen = () => {
     o.tentativas = 0; o.caiu = false; o.ultimaMsg = Date.now();
     if (o.codigo) {
-      enviar({ tipo: 'entrar', codigo: o.codigo, token: o.token, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha });
+      enviar(o.espectador ? { tipo: 'entrar', codigo: o.codigo, assistir: true, apelido: S.apelido || 'Visitante', senha: o.senha } : { tipo: 'entrar', codigo: o.codigo, token: o.token, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha });
       if (CALL.ativa) enviar({ tipo: 'call', ativo: true }); // voltou da queda: continua na call
     }
     else if (o.primeiro) o.primeiro();
@@ -2735,8 +2746,14 @@ function mostrarToast(texto, ms = 6000) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), ms);
 }
-function entrarNaSala(codigo, senha) {
+function entrarNaSala(codigo, senha, assistir = false) {
   S.codigoEntrar = codigo;
+  if (assistir) {
+    S.online = null;
+    conectar(() => enviar({ tipo: 'entrar', codigo, senha, assistir: true, apelido: S.apelido || 'Visitante' }));
+    S.online.senha = senha; S.online.querAssistir = true;
+    return;
+  }
   const salvo = ler('ur-sala', null);
   const mesma = salvo && salvo.codigo === codigo;
   const token = mesma ? salvo.token : null;
@@ -2765,8 +2782,9 @@ function receberDoServidor(m) {
   if (!o) return;
   if (m.tipo === 'entrou') {
     o.codigo = m.codigo; o.token = m.token; o.meuId = m.meuId; EU = m.meuId;
+    o.espectador = !!m.espectador;
     if (o.recriando) { o.recriando = null; S.avisoRecriada = true; }
-    guardarSala();
+    if (!o.espectador) guardarSala();
     if (location.pathname !== '/s/' + m.codigo) history.replaceState(null, '', '/s/' + m.codigo);
     return;
   }
@@ -2777,6 +2795,8 @@ function receberDoServidor(m) {
     atualizarBotsConfig();
     atualizarCall();
     const eu = m.sala.assentos.find((a) => a.id === EU);
+    if (o.espectador && m.sala.fase === 'espera') { S.erroInicio = 'A partida que você assistia acabou.'; return sairDaSala(); }
+    if (o.espectador) { if (S.tela === 'mesa') render(); else if (S.tela === 'fim') atualizarVotos(); else if (m.sala.fase === 'final' && S.e && S.tela !== 'arte') { S.arteDe = 'final'; S.tela = 'arte'; render(); } return; }
     if (m.sala.fase === 'espera' || (eu && eu.pendente)) { S.tela = 'espera'; render(); }
     else if (m.sala.fase === 'final') { if (S.e && S.tela !== 'arte') { document.querySelectorAll('.palco, .vitoria-show').forEach((x) => x.remove()); S.arteDe = 'final'; S.tela = 'arte'; render(); } }
     else if (S.tela === 'mesa') render();
@@ -2798,6 +2818,7 @@ function receberDoServidor(m) {
     if (el) el.textContent = m.mensagem;
     const b = document.getElementById('comecar') || document.getElementById('btn-entrar');
     if (b) b.disabled = false;
+    const ba = document.getElementById('btn-assistir'); if (ba) ba.disabled = false;
   }
 }
 // Monta, a partir do que o servidor mostrou, um "espelho" da mesa no formato do motor:
@@ -2874,6 +2895,8 @@ function telaEntrar() {
       <input id="senha-e" class="campo" maxlength="20" autocomplete="off" placeholder="Deixe em branco se não tiver">
       <p class="aviso erro" id="erro-entrar" role="alert" style="height:auto;white-space:normal"></p>
       <button class="btn btn-principal" id="btn-entrar" type="submit" style="min-height:56px">Entrar</button>
+      <button class="btn" id="btn-assistir" type="button" style="min-height:50px"><span aria-hidden="true">👁</span> Assistir partida</button>
+      <p class="ajuda" style="margin:0;text-align:center">Assistindo você vê a mesa e as jogadas, sem ver a mão de ninguém.</p>
     </form>
   </main>`;
   document.getElementById('voltar').onclick = () => { if (location.pathname.startsWith('/s/')) history.replaceState(null, '', '/'); S.tela = 'inicio'; render(); };
@@ -2885,6 +2908,13 @@ function telaEntrar() {
     document.getElementById('btn-entrar').disabled = true;
     document.getElementById('erro-entrar').textContent = 'Entrando…';
     entrarNaSala(codigo, document.getElementById('senha-e').value.trim());
+  };
+  document.getElementById('btn-assistir').onclick = () => {
+    S.apelido = document.getElementById('apelido-e').value.trim() || 'Visitante';
+    gravar('ur-apelido', S.apelido);
+    document.getElementById('btn-assistir').disabled = true;
+    document.getElementById('erro-entrar').textContent = 'Entrando para assistir…';
+    entrarNaSala(codigo, document.getElementById('senha-e').value.trim(), true);
   };
 }
 function telaEspera() {

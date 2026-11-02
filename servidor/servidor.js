@@ -82,8 +82,9 @@ function salasParaEntrar() {
     if (sala.fase === 'espera') pode = sala.assentos.some((a) => a.tipo === 'aberto') || (sala.config.salaAberta && sala.assentos.length < sala.capacidade);
     else if (sala.fase === 'jogando' && sala.config.salaAberta) pode = humanos < sala.capacidade;
     else if (sala.fase === 'jogando') pode = sala.assentos.some((a) => a.tipo === 'aberto');
-    if (!pode) continue;
-    lista.push({ codigo: sala.codigo, nome: sala.nome, temSenha: !!sala.senha, aberta: sala.config.salaAberta, jogando: sala.fase === 'jogando', ocupados, lugares: sala.config.salaAberta ? sala.capacidade : sala.assentos.length, modo: sala.config.fimModo, cores: sala.config.opcoes.cores || 5 });
+    const assistir = !pode && sala.fase === 'jogando';
+    if (!pode && !assistir) continue;
+    lista.push({ soAssistir: assistir, codigo: sala.codigo, nome: sala.nome, temSenha: !!sala.senha, aberta: sala.config.salaAberta, jogando: sala.fase === 'jogando', ocupados, lugares: sala.config.salaAberta ? sala.capacidade : sala.assentos.length, modo: sala.config.fimModo, cores: sala.config.opcoes.cores || 5 });
   }
   return lista.slice(0, 30);
 }
@@ -127,6 +128,7 @@ class Sala {
     this.e = null;
     this.fase = 'espera';
     this.timers = [];
+    this.espectadores = []; // quem só assiste a partida (não joga, não vota)
     this.prazoAte = 0;
     this.vazioDesde = 0;
     this.votos = null;   // entre as rodadas: { idJogador: true (Sim) | false (Não) }
@@ -144,16 +146,22 @@ class Sala {
   humanos() { return this.assentos.filter((a) => a.tipo === 'humano'); }
   resumo() {
     return {
-      codigo: this.codigo, nome: this.nome, temSenha: !!this.senha, dono: this.dono, fase: this.fase, config: this.config, votos: this.votos,
+      codigo: this.codigo, nome: this.nome, temSenha: !!this.senha, dono: this.dono, fase: this.fase, config: this.config, votos: this.votos, assistindo: this.espectadores.map((v) => v.nome),
       assentos: this.assentos.map((a) => ({ id: a.id, tipo: a.tipo, nome: a.nome, avatar: a.avatar || null, conectado: a.tipo !== 'humano' || a.conectado, pendente: !!a.pendente, sai: !!(a.saiu || a.sai), naCall: !!(a.naCall && a.conectado) })),
     };
   }
-  enviarSala() { for (const h of this.humanos()) if (h.conexao) h.conexao.enviar({ tipo: 'sala', sala: this.resumo() }); }
+  enviarSala() {
+    const r = this.resumo();
+    for (const h of this.humanos()) if (h.conexao) h.conexao.enviar({ tipo: 'sala', sala: r });
+    for (const v of this.espectadores) v.conexao.enviar({ tipo: 'sala', sala: r });
+  }
   enviarEstado(evento) {
     for (const h of this.humanos()) {
       if (!h.conexao || !this.e || h.pendente) continue;
       h.conexao.enviar({ tipo: 'estado', meuId: h.id, visao: visaoDe(this.e, h.id), evento: evento ? privado(evento, h.id) : null, prazo: this.prazoAte ? Math.max(0, this.prazoAte - Date.now()) : 0 });
     }
+    // quem assiste vê a mesa como alguém de fora: nenhuma mão aberta
+    if (this.e) for (const v of this.espectadores) v.conexao.enviar({ tipo: 'estado', meuId: v.id, visao: visaoDe(this.e, v.id), evento: evento ? privado(evento, v.id) : null, prazo: 0 });
   }
   limparTimers() { this.timers.forEach(clearTimeout); this.timers = []; this.prazoAte = 0; }
   depois(ms, fn) { this.timers.push(setTimeout(() => { try { fn(); } catch (err) { log('erro no timer', this.codigo, err.message); } }, ms)); }
@@ -451,6 +459,20 @@ function tratar(conexao, msg, ctx) {
   if (tipo === 'entrar') {
     const sala = salas.get(String(msg.codigo || '').toUpperCase());
     if (!sala) return erro(conexao, 'Sala não encontrada. Confira o link.');
+    if (msg.assistir) {
+      // assistir a partida: só olha a mesa (sem mão, sem voto)
+      if (sala.senha && msg.senha !== sala.senha) return erro(conexao, 'Senha errada.');
+      if (sala.fase !== 'jogando') return erro(conexao, sala.fase === 'final' ? 'Essa partida já terminou.' : 'A partida ainda não começou: entre na sala para jogar.');
+      if (sala.espectadores.length >= 20) return erro(conexao, 'Já tem gente demais assistindo.');
+      const v = { id: `v${sala.seq++}`, nome: limpaTexto(msg.apelido, 14) || 'Visitante', conexao, espectador: true };
+      sala.espectadores.push(v);
+      ctx.sala = sala; ctx.assento = v;
+      conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: null, meuId: v.id, espectador: true });
+      sala.enviarSala();
+      if (sala.e) conexao.enviar({ tipo: 'estado', meuId: v.id, visao: visaoDe(sala.e, v.id), evento: null, prazo: 0 });
+      log('assistindo', sala.codigo, v.nome);
+      return;
+    }
     const antigo = msg.token && sala.humanos().find((h) => h.token === msg.token);
     if (antigo) {
       if (antigo.conexao && antigo.conexao !== conexao) antigo.conexao.fechar();
@@ -479,6 +501,10 @@ function tratar(conexao, msg, ctx) {
 
   const { sala, assento } = ctx;
   if (!sala || !assento) return erro(conexao, 'Entre em uma sala primeiro.');
+  if (assento.espectador) {
+    if (tipo === 'sair') { sala.espectadores = sala.espectadores.filter((v) => v !== assento); ctx.sala = null; ctx.assento = null; sala.enviarSala(); }
+    return; // quem assiste não joga, não vota e não mexe na sala
+  }
 
   const entreMaosAgora = () => sala.fase === 'jogando' && sala.e && sala.e.fase !== 'jogando';
   const ativosMesa = () => sala.assentos.filter((a) => a.tipo !== 'aberto' && !a.sai && !a.saiu);
@@ -627,7 +653,10 @@ servidor.on('upgrade', (req, socket) => {
   if (!conexao) return;
   const ctx = { sala: null, assento: null };
   conexao.on('mensagem', (msg) => { try { tratar(conexao, msg, ctx); } catch (err) { log('erro', err.message); erro(conexao, 'Algo deu errado no servidor.'); } });
-  conexao.on('close', () => { if (ctx.sala && ctx.assento && ctx.assento.conexao === conexao) ctx.sala.caiu(ctx.assento); });
+  conexao.on('close', () => {
+    if (ctx.sala && ctx.assento && ctx.assento.espectador) { const sala = ctx.sala; sala.espectadores = sala.espectadores.filter((v) => v !== ctx.assento); sala.enviarSala(); return; }
+    if (ctx.sala && ctx.assento && ctx.assento.conexao === conexao) ctx.sala.caiu(ctx.assento);
+  });
 });
 
 // Salas sem ninguém conectado por 30 minutos são apagadas

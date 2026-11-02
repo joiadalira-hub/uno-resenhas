@@ -11,6 +11,7 @@ export const OPCOES_PADRAO = {
   mais5SobreMais2: true,      // um +2 pode ser respondido com +5
   vencerComEspecial: false,   // libera vencer com coringa ou carta de ação
   corte: false,               // jogar carta idêntica fora da vez
+  corteEspecial: false,       // com o Corte ligado: também corta com coringa (sobre coringa) e com ação idêntica (sem efeito)
   baterNoCorte: true,         // com o Corte ligado: pode bater (ganhar) cortando com a última carta
   comprarAtePoder: false,     // sem carta válida, compra até achar
   morteSubita: false,         // monte acabou pela 2ª vez: rodada termina
@@ -185,7 +186,13 @@ function checarJogada(e, idJogador, idsCartas, { foraDaVez }) {
     const t = e.topo, fis = e.descarte[e.descarte.length - 1];
     const c = cartas[0];
     const igual = (x) => x && x.tipo === 'num' && x.valor === c.valor && x.cor === c.cor;
-    if (cartas.length !== 1 || c.tipo !== 'num' || !igual(t) || !igual(fis) || e.compraPendente) throw new ErroJogada('corte', 'Corte só com carta idêntica ao topo: mesmo número e mesma cor');
+    const acaoIgual = (x) => x && x.tipo === c.tipo && x.cor === c.cor;
+    const especial = e.opcoes.corteEspecial && cartas.length === 1 && !e.compraPendente && (
+      (c.tipo === 'coringa' && fis && fis.tipo === 'coringa') || // coringa preto sobre coringa preto
+      (['pular', 'reverso', '+2'].includes(c.tipo) && acaoIgual(fis) && acaoIgual(t))); // mesma ação, mesma cor
+    if (!especial && (cartas.length !== 1 || c.tipo !== 'num' || !igual(t) || !igual(fis) || e.compraPendente)) {
+      throw new ErroJogada('corte', e.opcoes.corteEspecial ? 'Corte só com carta idêntica ao topo (mesmo número/ação e cor, ou coringa sobre coringa)' : 'Corte só com carta idêntica ao topo: mesmo número e mesma cor');
+    }
   }
 
   // Só se vence com números
@@ -294,10 +301,10 @@ function jogar(e, acao, foraDaVez) {
 
   if (vence) return encerrarRodada(e, j.id);
 
-  // efeitos somados
+  // efeitos somados (carta de ação usada no corte não tem efeito: só corta a vez)
   let pular = 0;
   const eventos = [];
-  switch (ultimaEf.tipo) {
+  switch (foraDaVez && ultimaEf.tipo !== 'num' ? 'nenhum' : ultimaEf.tipo) {
     case 'num':
       if (zero) {
         const alvo = e.jogadores[idx(e, acao.zero.alvo)];

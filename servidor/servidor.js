@@ -287,7 +287,7 @@ class Sala {
     const n = jogada ? jogada.fisicas.length : 0;
     // combo / Pular / Reverso: um palco só (cai → efeito → recolhe na pilha), igual ao celular
     const ultEf = jogada ? jogada.efetivas[n - 1] : null;
-    const efeito = evento.reverso ? 'reverso' : jogada && this.e.fase === 'jogando' && ultEf.tipo === 'pular' ? 'pulo' : null;
+    const efeito = evento.reverso ? 'reverso' : jogada && evento.acao && evento.acao.tipo !== 'corte' && this.e.fase === 'jogando' && ultEf.tipo === 'pular' ? 'pulo' : null;
     if (jogada && (n > 1 || efeito)) {
       const tEspalha = 450 + n * 225 + 150;
       const tB = efeito ? tEspalha + 350 : tEspalha;
@@ -545,7 +545,7 @@ function tratar(conexao, msg, ctx) {
   if (tipo === 'config') {
     if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala muda as regras.');
     if (sala.fase !== 'espera' && !(sala.e && sala.e.fase !== 'jogando')) return erro(conexao, 'Espere a mão acabar para mudar as regras.');
-    const PERMITIDAS = ['acumularCompras', 'mais2NaoRespondeMais5', 'mais5SobreMais2', 'vencerComEspecial', 'corte', 'baterNoCorte', 'comprarAtePoder', 'morteSubita', 'regraDo5', 'regraDo9'];
+    const PERMITIDAS = ['acumularCompras', 'mais2NaoRespondeMais5', 'mais5SobreMais2', 'vencerComEspecial', 'corte', 'corteEspecial', 'baterNoCorte', 'comprarAtePoder', 'morteSubita', 'regraDo5', 'regraDo9'];
     const novas = {};
     for (const k of PERMITIDAS) if (msg.opcoes && typeof msg.opcoes[k] === 'boolean') novas[k] = msg.opcoes[k];
     if (msg.opcoes && [4, 5, 6].includes(Number(msg.opcoes.cores))) novas.cores = Number(msg.opcoes.cores); // baralho novo na próxima mão

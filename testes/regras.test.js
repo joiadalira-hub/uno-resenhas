@@ -346,3 +346,35 @@ test('corte só com mesmo número e mesma cor', () => {
   aplicar(e2, { tipo: 'jogar', jogador: 'j1', cartas: [cinco.id], cor: 'azul' });
   assert.throws(() => aplicar(e2, { tipo: 'corte', jogador: 'j2', cartas: [cincoAzul.id] }));
 });
+
+test('corte com coringa e ação (opcional): só corta a vez, a ação não vale', () => {
+  const pularAzul = C('pular', 'azul'), pularAzul2 = C('pular', 'azul'), pularVerde = C('pular', 'verde');
+  // desligado: ação não corta
+  const e0 = mesa({ maos: [extras(), [pularAzul2, ...extras()], extras(), extras()], topo: pularAzul, opcoes: { corte: true }, vez: 0 });
+  assert.throws(() => aplicar(e0, { tipo: 'corte', jogador: 'j2', cartas: [pularAzul2.id] }));
+  // ligado: Pular azul corta Pular azul; outra cor não; e ninguém é pulado
+  const e = mesa({ maos: [extras(), [pularAzul2, pularVerde, ...extras()], extras(), extras()], topo: pularAzul, opcoes: { corte: true, corteEspecial: true }, vez: 0 });
+  assert.throws(() => aplicar(e, { tipo: 'corte', jogador: 'j2', cartas: [pularVerde.id] }));
+  aplicar(e, { tipo: 'corte', jogador: 'j2', cartas: [pularAzul2.id] });
+  assert.equal(e.vez, 2); // o próximo depois de quem cortou, sem pular ninguém
+  // Reverso não inverte; +2 não faz comprar
+  const rev = C('reverso', 'verde'), rev2 = C('reverso', 'verde');
+  const e2 = mesa({ maos: [extras(), extras(), [rev2, ...extras()], extras()], topo: rev, opcoes: { corte: true, corteEspecial: true }, vez: 0 });
+  const sentido = e2.sentido;
+  aplicar(e2, { tipo: 'corte', jogador: 'j3', cartas: [rev2.id] });
+  assert.equal(e2.sentido, sentido);
+  const m2 = C('+2', 'vermelho'), m2b = C('+2', 'vermelho');
+  const e3 = mesa({ maos: [extras(), [m2b, ...extras()], extras()], topo: m2, opcoes: { corte: true, corteEspecial: true }, vez: 0 });
+  aplicar(e3, { tipo: 'corte', jogador: 'j2', cartas: [m2b.id] });
+  assert.equal(e3.compraPendente, null);
+  // coringa corta coringa e escolhe a cor
+  const cor1 = C('coringa'), cor2 = C('coringa');
+  const e4 = mesa({ maos: [extras(), [cor2, ...extras()], extras()], topo: cor1, opcoes: { corte: true, corteEspecial: true }, vez: 0 });
+  e4.topo = { tipo: 'coringa', cor: 'azul' }; e4.corAtual = 'azul';
+  aplicar(e4, { tipo: 'corte', jogador: 'j2', cartas: [cor2.id], cor: 'verde' });
+  assert.equal(e4.corAtual, 'verde');
+  // número sobre coringa não corta
+  const e5 = mesa({ maos: [extras(), [N('azul', 3), ...extras()], extras()], topo: cor1, opcoes: { corte: true, corteEspecial: true }, vez: 0 });
+  e5.topo = { tipo: 'coringa', cor: 'azul' }; e5.corAtual = 'azul';
+  assert.throws(() => aplicar(e5, { tipo: 'corte', jogador: 'j2', cartas: [e5.jogadores[1].mao[0].id] }));
+});

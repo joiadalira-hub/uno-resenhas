@@ -17,6 +17,7 @@ const REGRAS_OPCIONAIS = [
   ['mais2NaoRespondeMais5', '+2 não responde a +4/+5/+6', 'Só outro coringa de compra ou Ctrl+C defendem'],
   ['vencerComEspecial', 'Vencer com carta especial', 'Libera vencer com coringa ou ação'],
   ['corte', 'Corte', 'Carta idêntica ao topo joga fora da vez'],
+  ['corteEspecial', 'Corte com coringa e ação', 'Com o Corte ligado: coringa corta coringa, e Pular/Reverso/+2 cortam a mesma carta da mesma cor (a ação não vale, só corta a vez)'],
   ['baterNoCorte', 'Bater no corte', 'Com o Corte ligado: dá para ganhar cortando com a última carta'],
   ['comprarAtePoder', 'Comprar até poder jogar', 'Compra até achar uma carta válida'],
   ['morteSubita', 'Morte súbita', 'O monte acaba 2 vezes: fim da rodada'],
@@ -1272,7 +1273,7 @@ function posAcao(acao, r, jogada, antes) {
   // Combo, Pular e Reverso: uma animação só; as cartas só vão para a pilha no fim dela
   let efeito = null;
   if (jogada && S.e.sentido !== sentidoAntes) efeito = { tipo: 'reverso', sentido: S.e.sentido };
-  else if (jogada && S.e.fase === 'jogando' && jogada.efetivas[jogada.efetivas.length - 1].tipo === 'pular') {
+  else if (jogada && acao.tipo !== 'corte' && S.e.fase === 'jogando' && jogada.efetivas[jogada.efetivas.length - 1].tipo === 'pular') {
     const N = S.e.jogadores.length, q = jogada.fisicas.length;
     const pulados = Array.from({ length: q }, (_, k) => S.e.jogadores[(((jogada.indice + S.e.sentido * (k + 1)) % N) + N) % N].id);
     efeito = { tipo: 'pulo', pulados, destino: S.e.jogadores[S.e.vez].id };

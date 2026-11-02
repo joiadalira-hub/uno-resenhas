@@ -522,6 +522,8 @@ function tratar(conexao, msg, ctx) {
   if (tipo === 'acao') {
     const acao = { ...(msg.acao || {}), jogador: assento.id };
     if (['tempo9', 'proxima_rodada'].includes(acao.tipo)) return;
+    // Regra do 9: toque antes da animação acabar não conta (todo mundo larga junto)
+    if (acao.tipo === 'apertar9' && (sala.animaAte || 0) - 300 > Date.now()) return;
     const falta = (sala.animaAte || 0) - 400 - Date.now(); // 400 ms de folga para a rede
     if (falta > 0 && ['jogar', 'comprar', 'passar', 'desafiar'].includes(acao.tipo)) {
       // chegou antes da animação acabar: vale assim que ela terminar

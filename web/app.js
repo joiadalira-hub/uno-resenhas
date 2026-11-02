@@ -884,6 +884,29 @@ function abrirOrdem() {
 }
 // 😏 desenhado no estilo gravado da mesa (igual em todo celular)
 const CARINHA = '<circle r="27" class="g-rosto"/><path class="g-traco" d="M6 -18 q6 -4 12 0"/><path class="g-traco" d="M-17 -6 h14 M3 -6 h14"/><path class="g-ponto" d="M-9 -6 a6 6 0 0 0 12 0z M11 -6 a6 6 0 0 0 12 0z"/><path class="g-traco" d="M-11 13 q13 4 21 -9"/>';
+// Regra do 9: a janela só abre quando a animação da jogada termina (todo mundo larga junto)
+const PRAZO9 = 6000;
+const noveAberto = () => !!(S.e && S.e.regra9 && S.ui && S.ui.noveAbre && Date.now() >= S.ui.noveAbre);
+function prepararNove(esperaCombo) {
+  const ui = S.ui, e = S.e;
+  if (!e.regra9) { ui.noveAbre = null; return; }
+  if (ui.noveAbre) return;
+  ui.noveAbre = Date.now() + esperaCombo + 120;
+  setTimeout(() => {
+    if (S.ui !== ui || !S.e || !S.e.regra9) return;
+    if (S.tela === 'mesa') render();
+    if (!S.e.regra9.apertaram.includes(EU)) flashNove();
+  }, ui.noveAbre - Date.now());
+}
+function flashNove() {
+  if (document.body.classList.contains('modo-leve') && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const f = document.createElement('div');
+  f.className = 'flash-nove'; f.setAttribute('aria-hidden', 'true');
+  f.innerHTML = '<b>APERTA O 9!</b>';
+  document.body.appendChild(f);
+  tocar('sua-vez');
+  setTimeout(() => f.remove(), 950);
+}
 // a próxima jogada só vale depois que a animação atual terminar (evita cartas e efeitos se atropelando)
 let timerFimAnim = null;
 const temRelogio = () => (S.online ? !!(S.online.sala && S.online.sala.config && S.online.sala.config.tempo) || !!S.ui.prazoServidor : !!(S.config && S.config.tempo));
@@ -983,10 +1006,11 @@ function telaMesa() {
         ${v.compraPendente ? `<span class="pilula compra">Compra acumulada: ${v.compraPendente.quantidade}</span>` : ''}
   <button type="button" class="btn-ordem" id="ordem" aria-haspopup="dialog" aria-label="Organizar a mão: ${esc(ORDENS.find((o) => o[0] === S.ordem)[1])}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>${esc(ORDENS.find((o) => o[0] === S.ordem)[2])}</button>
       </div>
-    ${v.regra9 ? (() => {
+    ${v.regra9 && noveAberto() ? (() => {
       const jaApertei = v.regra9.apertaram.includes(EU);
       const q = v.regra9.quantidade;
-      return `<div class="nove-box"><button class="btn-nove ${jaApertei ? 'feito' : ''}" id="apertar9" ${jaApertei ? 'disabled' : ''} aria-label="Apertar o 9">(9)</button>
+      const passou = Math.min(PRAZO9, Date.now() - ui.noveAbre);
+      return `<div class="nove-box"><span class="nove-anel" aria-hidden="true" style="--prazo9:${PRAZO9}ms;--passou9:-${passou}ms"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/></svg></span><button class="btn-nove ${jaApertei ? 'feito' : ''}" id="apertar9" ${jaApertei ? 'disabled' : ''} aria-label="Apertar o 9">(9)</button>
         <span>${jaApertei ? 'Você apertou! Torcendo…' : 'Aperte rápido! (tecla 9)'} · o último compra ${q} ${q === 1 ? 'carta' : 'cartas'}</span></div>`;
     })() : ''}
       ${vulneravelRival ? `<button class="btn btn-perigo pegou-flutua" id="pegou">Pegou! <small>${esc(nomeJog(vulneravelRival).replace('Bot ', ''))} não disse Última</small></button>` : ''}
@@ -1178,6 +1202,7 @@ function descrever(acao, r) {
 function agir(acao) {
   const ui = S.ui;
   if (ui.distribuindo && acao.jogador === EU) return;
+  if (acao.tipo === 'apertar9' && acao.jogador === EU && !noveAberto()) return; // antes da janela abrir: não conta
   if (acao.jogador === EU && ESPERA_ANIM.has(acao.tipo) && emAnimacao()) {
     // chegou cedo (relógio, compra automática): faz assim que a animação acabar
     const e0 = S.e;
@@ -1997,15 +2022,17 @@ function depoisDeMudar() {
   }, 2600 + esperaCombo);
 
   // Regra do 9: enquanto o (9) está aberto, ninguém joga; os bots apertam com reflexos diferentes
+  prepararNove(esperaCombo);
   if (e.regra9) {
     ui.prazo = 0;
     if (!ui.timers9) {
       ui.timers9 = [];
+      const abre = Math.max(0, ui.noveAbre - Date.now());
       for (const j of e.jogadores) if (j.bot) {
-        const reflexo = 450 + Math.random() * 2200;
+        const reflexo = abre + 450 + Math.random() * 2200;
         ui.timers9.push(setTimeout(() => { if (S.e && S.e.regra9 && !S.e.regra9.apertaram.includes(j.id)) agir({ tipo: 'apertar9', jogador: j.id }); }, reflexo));
       }
-      ui.timers9.push(setTimeout(() => { if (S.e && S.e.regra9) agir({ tipo: 'tempo9' }); }, 6000));
+      ui.timers9.push(setTimeout(() => { if (S.e && S.e.regra9) agir({ tipo: 'tempo9' }); }, abre + PRAZO9));
     }
     return render();
   }
@@ -2046,6 +2073,7 @@ function depoisDeMudar() {
 // Online: o servidor controla bots e tempo; aqui só o relógio, os sons e a tela
 function depoisDeMudarOnline(esperaCombo) {
   const e = S.e, ui = S.ui;
+  prepararNove(esperaCombo);
   const atual = e.jogadores[e.vez];
   const vezAntes = ui.vezAnterior;
   ui.prazo = 0;

@@ -871,6 +871,18 @@ body.paisagem .feltro .gravado { top: 9.5%; height: 21%; left: 29%; width: 42%; 
 .chip-ultima .caixa { flex: none; width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--destaque); display: grid; place-items: center; font-size: 14px; color: var(--sobre-destaque); }
 .chip-ultima[aria-pressed="true"] { background: rgba(255,212,59,.22); }
 .chip-ultima[aria-pressed="true"] .caixa { background: var(--destaque); }
+/* Regra do 9: anel do prazo e o sinal de largada */
+.nove-box { isolation: isolate; }
+.nove-anel { position: absolute; top: -20px; left: 50%; width: 172px; height: 172px; margin-left: -86px; z-index: 1; pointer-events: none; }
+.nove-anel svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.nove-anel circle { fill: none; stroke: var(--destaque); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 289; stroke-dashoffset: 0; filter: drop-shadow(0 0 6px rgba(255,212,59,.7)); animation: prazo9 var(--prazo9) linear var(--passou9) forwards; }
+@keyframes prazo9 { to { stroke-dashoffset: 289; stroke: var(--perigo); } }
+.btn-nove.feito ~ * .nove-anel, .nove-box:has(.feito) .nove-anel { display: none; }
+.flash-nove { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; pointer-events: none; background: radial-gradient(circle, rgba(242,69,61,.35), transparent 60%); animation: flash9 .95s ease-out forwards; }
+.flash-nove b { font: 900 italic clamp(40px, 13vw, 84px)/1 var(--logo); color: #fff; -webkit-text-stroke: 3px #9E1B14; text-shadow: 0 6px 0 #9E1B14, 0 0 30px rgba(255,80,60,.8); transform: rotate(-6deg); animation: flash9b .95s cubic-bezier(.2,1.4,.4,1) forwards; }
+@keyframes flash9 { 0% { opacity: 0; } 12% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes flash9b { 0% { transform: rotate(-6deg) scale(.4); } 30% { transform: rotate(-6deg) scale(1.08); } 100% { transform: rotate(-6deg) scale(1); } }
+body.modo-leve .flash-nove { background: none; }
 </style>
 
 <div id="app"></div>

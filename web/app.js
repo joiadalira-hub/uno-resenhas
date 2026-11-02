@@ -2030,7 +2030,8 @@ function depoisDeMudar() {
       ui.timers9 = [];
       const abre = Math.max(0, ui.noveAbre - Date.now());
       for (const j of e.jogadores) if (j.bot) {
-        const reflexo = abre + 450 + Math.random() * 2200;
+        // quem soltou o 9 já está esperando: quase sempre aperta primeiro (só 5% das vezes demora)
+        const reflexo = abre + (j.id === e.regra9.por && Math.random() >= 0.05 ? 150 + Math.random() * 300 : 450 + Math.random() * 2200);
         ui.timers9.push(setTimeout(() => { if (S.e && S.e.regra9 && !S.e.regra9.apertaram.includes(j.id)) agir({ tipo: 'apertar9', jogador: j.id }); }, reflexo));
       }
       ui.timers9.push(setTimeout(() => { if (S.e && S.e.regra9) agir({ tipo: 'tempo9' }); }, abre + PRAZO9));

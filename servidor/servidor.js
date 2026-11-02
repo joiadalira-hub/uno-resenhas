@@ -336,7 +336,9 @@ class Sala {
     this.animaAte = Date.now() + espera; // até aqui ninguém joga (a animação ainda roda nos celulares)
     if (e.regra9) {
       for (const j of e.jogadores) if (j.bot && !e.regra9.apertaram.includes(j.id)) {
-        this.depois(espera + 450 + randomInt(2200), () => { if (this.e.regra9 && !this.e.regra9.apertaram.includes(j.id)) this.agir({ tipo: 'apertar9', jogador: j.id }, j.id); });
+        // quem soltou o 9 quase sempre aperta primeiro (só 5% das vezes demora)
+        const rapido = j.id === e.regra9.por && randomInt(100) >= 5;
+        this.depois(espera + (rapido ? 150 + randomInt(300) : 450 + randomInt(2200)), () => { if (this.e.regra9 && !this.e.regra9.apertaram.includes(j.id)) this.agir({ tipo: 'apertar9', jogador: j.id }, j.id); });
       }
       this.depois(espera + 6000, () => { if (this.e.regra9) this.agir({ tipo: 'tempo9' }, 'servidor'); });
       return;

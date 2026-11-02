@@ -882,6 +882,8 @@ function abrirOrdem() {
   f.querySelector('#ordem-fechar').onclick = () => f.remove();
   f.addEventListener('pointerdown', (ev) => { if (ev.target === f) f.remove(); });
 }
+// 😏 desenhado no estilo gravado da mesa (igual em todo celular)
+const CARINHA = '<circle r="27" class="g-rosto"/><path class="g-traco" d="M6 -18 q6 -4 12 0"/><path class="g-traco" d="M-17 -6 h14 M3 -6 h14"/><path class="g-ponto" d="M-9 -6 a6 6 0 0 0 12 0z M11 -6 a6 6 0 0 0 12 0z"/><path class="g-traco" d="M-11 13 q13 4 21 -9"/>';
 // a próxima jogada só vale depois que a animação atual terminar (evita cartas e efeitos se atropelando)
 let timerFimAnim = null;
 const temRelogio = () => (S.online ? !!(S.online.sala && S.online.sala.config && S.online.sala.config.tempo) || !!S.ui.prazoServidor : !!(S.config && S.config.tempo));
@@ -955,7 +957,7 @@ function telaMesa() {
       </span>
     </div>
     <div class="arena" ${fixo ? `style="flex:none;height:${fixo.h}px"` : ''}>
-      <div class="feltro" aria-hidden="true"></div>
+      <div class="feltro" aria-hidden="true"><svg class="gravado" viewBox="0 0 600 150" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="gGrav" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE68A"/><stop offset=".55" stop-color="#E9B23A"/><stop offset="1" stop-color="#B9791C"/></linearGradient><path id="arcoGrav" d="M 40 120 Q 300 0 560 120"/></defs><g class="grav-sombra"><text><textPath href="#arcoGrav" startOffset="44%" text-anchor="middle">Resenhas</textPath></text><g transform="translate(524 82) rotate(8) scale(1.3)">${CARINHA}</g></g><g class="grav-ouro"><text><textPath href="#arcoGrav" startOffset="44%" text-anchor="middle">Resenhas</textPath></text><g transform="translate(524 82) rotate(8) scale(1.3)">${CARINHA}</g></g></svg></div>
       ${assentos.map(({ j, x, y }) => `<div class="assento ${j.id === v.vez ? 'vez' : ''} ${caiuDaSala(j.id) ? 'caiu' : ''} ${estaNaCall(j.id) ? 'na-call' : ''} ${cartasVisiveis(j) === 1 ? 'uma' : ''} ${v.regra9 && v.regra9.apertaram.includes(j.id) ? 'apertou9' : ''}" data-id="${j.id}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;--cor-jog:${corDoJogador(j.id)}">
         ${j.id === v.vez ? '<span class="selo-vez">Jogando</span>' : ''}
         <div class="leque" aria-hidden="true">${leque(cartasVisiveis(j))}</div>

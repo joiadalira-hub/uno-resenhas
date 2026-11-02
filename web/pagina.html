@@ -843,6 +843,19 @@ body.paisagem .mesa .aviso { display: -webkit-box; -webkit-line-clamp: 3; -webki
 .titulo-tela { font-size: clamp(16px, calc(var(--vw, 100vw) * 0.062), 32px) !important; }
 .bloco > .linha { flex-wrap: wrap; row-gap: 6px; }
 .lista-lugares { grid-template-columns: repeat(auto-fill, minmax(min(100%, 165px), 1fr)); }
+/* nome gravado no feltro: "Resenhas" + 😏 desenhado, por baixo de tudo */
+.feltro .gravado { position: absolute; left: 24%; top: 11%; height: 17%; width: 52%; overflow: visible; pointer-events: none; }
+.gravado text { font: 900 italic 66px var(--logo); letter-spacing: -1px; }
+.gravado .grav-sombra { transform: translate(0, 2.5px); fill: rgba(0,0,0,.45); stroke: rgba(0,0,0,.45); }
+.gravado .grav-ouro { fill: url(#gGrav); stroke: url(#gGrav); opacity: .5; }
+.gravado .grav-ouro, .gravado .grav-sombra { stroke-width: 0; }
+.gravado .g-rosto { fill: none; stroke-width: 5.5px; }
+.gravado .grav-sombra .g-rosto, .gravado .grav-sombra .g-traco { stroke: rgba(0,0,0,.45); }
+.gravado .g-traco { fill: none; stroke-width: 4.5px; stroke-linecap: round; }
+.gravado .grav-ouro .g-rosto, .gravado .grav-ouro .g-traco { stroke: #E9B23A; }
+.gravado .g-ponto { stroke: none; }
+body.modo-leve .gravado { opacity: .9; }
+body.paisagem .feltro .gravado { top: 9.5%; height: 21%; left: 29%; width: 42%; }
 </style>
 
 <div id="app"></div>

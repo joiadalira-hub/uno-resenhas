@@ -2167,7 +2167,6 @@ function telaFim() {
     </div>
     <div class="tabela"><div class="lin cab"><span>Pos.</span><span>Jogador</span><span class="dir">Na mão</span><span class="dir">Ganhou</span></div>${linhas}</div>
     <div class="tabela"><div class="lin cab ${aberta ? 'cinco' : ''}"><span></span><span>Placar geral</span><span class="dir">Vitórias</span>${aberta ? '<span class="dir">Mãos</span>' : ''}<span class="dir">Pontos</span></div>${geral}</div>
-    ${S.online && S.online.sala && (aberta || S.online.sala.assentos.some((a) => a.tipo === 'aberto')) ? htmlConvite(S.online.sala) : ''}
     <section class="bloco votacao">
       <span class="rotulo">${acabou ? 'Jogar outra partida?' : aberta ? 'Jogar a próxima mão?' : 'Jogar a próxima rodada?'}</span>
       ${votou
@@ -2180,6 +2179,7 @@ function telaFim() {
           <button class="btn btn-principal" id="ok-voto" ${ui.voto === undefined ? 'disabled' : ''}>OK</button>`}
       <div class="votos" id="votos">${htmlVotos()}</div>
     </section>
+    ${S.online && S.online.sala && (aberta || S.online.sala.assentos.some((a) => a.tipo === 'aberto')) ? htmlConvite(S.online.sala) : ''}
     <div class="fim-botoes">
       ${dono ? `<button class="btn" id="config-sala">⚙ Regras da sala</button><button class="btn" id="finalizar">Finalizar partida</button>` : ''}
       ${acabou && !dono ? `<button class="btn" id="ver-arte">Arte do placar</button>` : ''}

@@ -926,7 +926,10 @@ function telaMesa() {
   const mao = ordenarMao(maoBruta);
   const fim = e.opcoes.fim;
   const rotRodada = fim.modo === 'rodadas' ? `Rodada ${e.rodada} de ${fim.valor}` : fim.modo === 'pontos' ? `Rodada ${e.rodada} · até ${fim.valor} pts` : e.opcoes.salaAberta ? `Mão ${e.rodada} · sala aberta` : fim.modo === 'vitorias' ? `Rodada ${e.rodada} · vitórias` : `Rodada ${e.rodada}`;
-  const rivais = v.jogadores.filter((j) => j.id !== EU);
+  // os adversários aparecem na ordem da vez a partir de você (o próximo depois de você primeiro), igual para todo mundo na mesa;
+  // antes a ordem era a da lista da sala, e quem não era o 1º via a mesa "pulando"
+  const eui = v.jogadores.findIndex((j) => j.id === EU);
+  const rivais = eui < 0 ? v.jogadores.slice() : [...v.jogadores.slice(eui + 1), ...v.jogadores.slice(0, eui)];
   const restam = ui.prazo ? Math.max(0, Math.ceil((ui.prazo - Date.now()) / 1000)) : null;
 
   // jogáveis e combo
@@ -1152,7 +1155,8 @@ function renderModal() {
   let corpo = '';
   if (m.tipo === 'cor' || m.tipo === 'cor5') corpo = `<h2 style="font-size:24px">${m.tipo === 'cor5' ? 'Regra do 5: escolher a próxima cor?' : 'Escolha a próxima cor'}</h2>${cores(m.tipo === 'cor5')}`;
   if (m.tipo === 'zero') {
-    const outros = S.e.jogadores.filter((j) => j.id !== EU);
+    const ie = S.e.jogadores.findIndex((j) => j.id === EU);
+    const outros = [...S.e.jogadores.slice(ie + 1), ...S.e.jogadores.slice(0, Math.max(0, ie))]; // na ordem da vez, a partir de você
     corpo = `<h2 style="font-size:24px">Zero: o que fazer?</h2>
       <div class="segmentos"><button data-efeito="trocar" aria-pressed="${String(m.efeito !== 'espiar')}">Trocar a mão</button><button data-efeito="espiar" aria-pressed="${String(m.efeito === 'espiar')}">Espiar a mão</button></div>
       <span class="rotulo">Com quem</span>

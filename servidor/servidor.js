@@ -14,6 +14,9 @@ import { escolherAcao } from '../motor/bot.js';
 
 const PORTA = Number(process.env.PORT) || 3000;
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
+// versão da página publicada: quem estiver com uma página antiga aberta recebe o aviso para atualizar
+let VERSAO = '';
+try { VERSAO = (fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8').match(/const VERSAO = '([0-9a-f]{10})'/) || [])[1] || ''; } catch { /* sem dist */ }
 const NOMES_BOTS = ['Ana', 'Rui', 'Bia', 'Léo', 'Duda', 'Caio', 'Mel', 'Nina', 'Tito'];
 const ESPERA_RECONEXAO = 5000;  // caiu a conexão: em 5 s um bot joga por ele até a mão acabar (se voltar, retoma)
 const ESPERA_VOTOS = 90000;
@@ -469,13 +472,13 @@ function erro(conexao, mensagem) { conexao.enviar({ tipo: 'erro', mensagem }); }
 
 function tratar(conexao, msg, ctx) {
   const { tipo } = msg;
-  if (tipo === 'ping') return conexao.enviar({ tipo: 'pong' });
+  if (tipo === 'ping') return conexao.enviar({ tipo: 'pong', versao: VERSAO });
 
   if (tipo === 'criar') {
     const sala = new Sala(msg, conexao);
     salas.set(sala.codigo, sala);
     ctx.sala = sala; ctx.assento = sala.assentos[0];
-    conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: ctx.assento.token, meuId: ctx.assento.id });
+    conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: ctx.assento.token, meuId: ctx.assento.id, versao: VERSAO });
     sala.enviarSala();
     log('sala criada', sala.codigo, `(${sala.assentos.length} lugares)`);
     return;
@@ -492,7 +495,7 @@ function tratar(conexao, msg, ctx) {
       const v = { id: `v${sala.seq++}`, nome: limpaTexto(msg.apelido, 14) || 'Visitante', conexao, espectador: true };
       sala.espectadores.push(v);
       ctx.sala = sala; ctx.assento = v;
-      conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: null, meuId: v.id, espectador: true });
+      conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: null, meuId: v.id, espectador: true, versao: VERSAO });
       sala.enviarSala();
       if (sala.e) conexao.enviar({ tipo: 'estado', meuId: v.id, visao: visaoDe(sala.e, v.id), evento: null, prazo: 0 });
       log('assistindo', sala.codigo, v.nome);
@@ -518,7 +521,7 @@ function tratar(conexao, msg, ctx) {
         ctx.sala = sala; ctx.assento = sala.assentos[i];
       }
     }
-    conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: ctx.assento.token, meuId: ctx.assento.id });
+    conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: ctx.assento.token, meuId: ctx.assento.id, versao: VERSAO });
     sala.enviarSala();
     if (sala.e && !ctx.assento.pendente) conexao.enviar({ tipo: 'estado', meuId: ctx.assento.id, visao: visaoDe(sala.e, ctx.assento.id), evento: null, prazo: sala.prazoAte ? Math.max(0, sala.prazoAte - Date.now()) : 0 });
     return;

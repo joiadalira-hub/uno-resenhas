@@ -930,6 +930,9 @@ body.modo-leve .supreme-flash, body.modo-leve .supreme-faisca { display: none; }
 @media (prefers-reduced-motion: reduce) { .supreme-tag { animation: none; transform: rotate(-4deg); } .supreme .anim-titulo { animation: none; } }
 body.paisagem .supreme-tag, .baixo .supreme-tag { font-size: clamp(20px, 7.5vh, 40px); margin-bottom: -2px; }
 .btn-voltar-jogada { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; background: transparent; border-style: dashed; color: var(--suave); font-size: 15px; }
+.aviso-versao { position: fixed; left: 50%; top: max(10px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 80; width: min(94vw, 460px); box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 16px; background: rgba(14,20,52,.97); border: 2px solid var(--destaque); box-shadow: 0 12px 30px rgba(0,0,0,.6); font-size: 14px; line-height: 1.3; }
+.aviso-versao span { flex: 1; min-width: 0; }
+.aviso-versao .btn { flex: none; min-height: 42px; }
 </style>
 
 <div id="app"></div>

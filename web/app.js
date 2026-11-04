@@ -2,6 +2,7 @@
 // Usa o motor (cartas.js, regras.js, bot.js), que é colado antes deste arquivo no build.
 
 const VC = 2; // versão das imagens das cartas: mude quando trocar alguma arte (força baixar de novo)
+const VERSAO = '__VERSAO__'; // trocada no build
 let EU = 'eu'; // no online vira o id que o servidor deu para você
 const NOMES_BOTS = ['Ana', 'Rui', 'Bia', 'Léo', 'Duda', 'Caio', 'Mel', 'Nina', 'Tito'];
 const NOME_DA_COR = { vermelho: 'Vermelho', azul: 'Azul', verde: 'Verde', amarelo: 'Amarelo', roxo: 'Roxo', rosa: 'Rosa' };
@@ -2872,6 +2873,15 @@ function salaSumiu() {
   if (o.recriando.dono) enviar({ ...o.criacao, codigo: o.codigo, apelido: S.apelido, avatar: S.avatar });
   else setTimeout(() => { if (S.online === o && o.recriando) enviar({ tipo: 'entrar', codigo: o.codigo, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha || '' }); }, 3000);
 }
+// o site foi atualizado e este celular ainda está com a versão antiga aberta: pede para atualizar (volta para o mesmo lugar na mesa)
+function avisarVersaoNova() {
+  if (document.querySelector('.aviso-versao')) return;
+  const d = document.createElement('div');
+  d.className = 'aviso-versao'; d.setAttribute('role', 'alert');
+  d.innerHTML = '<span><b>Tem versão nova do jogo.</b> Atualize para tudo funcionar igual para todos.</span><button class="btn btn-principal" type="button">Atualizar</button>';
+  d.querySelector('button').onclick = () => location.reload();
+  document.body.appendChild(d);
+}
 function mostrarToast(texto, ms = 6000) {
   document.querySelectorAll('.toast').forEach((x) => x.remove());
   const t = document.createElement('div');
@@ -2913,6 +2923,7 @@ function sairDaSala() {
 function receberDoServidor(m) {
   const o = S.online;
   if (!o) return;
+  if (m.versao && m.versao !== VERSAO && !VERSAO.startsWith('__')) avisarVersaoNova();
   if (m.tipo === 'entrou') {
     o.codigo = m.codigo; o.token = m.token; o.meuId = m.meuId; EU = m.meuId;
     o.espectador = !!m.espectador;

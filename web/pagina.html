@@ -933,6 +933,12 @@ body.paisagem .supreme-tag, .baixo .supreme-tag { font-size: clamp(20px, 7.5vh, 
 .aviso-versao { position: fixed; left: 50%; top: max(10px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 80; width: min(94vw, 460px); box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 16px; background: rgba(14,20,52,.97); border: 2px solid var(--destaque); box-shadow: 0 12px 30px rgba(0,0,0,.6); font-size: 14px; line-height: 1.3; }
 .aviso-versao span { flex: 1; min-width: 0; }
 .aviso-versao .btn { flex: none; min-height: 42px; }
+/* celular deitado: o jogo é na vertical */
+.gire-celular { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; background: radial-gradient(circle at 50% 40%, #1C2A6B, #070B24 70%); color: #fff; }
+.gire-celular svg { color: var(--destaque); animation: girar-cel 1.8s ease-in-out infinite; }
+.gire-celular b { font: 900 26px var(--display); }
+.gire-celular span { color: var(--suave); font-size: 15px; }
+@keyframes girar-cel { 0%, 20% { transform: rotate(-90deg); } 55%, 100% { transform: rotate(0deg); } }
 </style>
 
 <div id="app"></div>

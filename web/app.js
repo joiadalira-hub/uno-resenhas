@@ -157,7 +157,7 @@ function ligarTelaCheia() {
   if (!b) return;
   b.onclick = () => {
     const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-    Promise.resolve(p).catch(() => mostrarToast('Este navegador não deixou abrir em tela cheia', 3500));
+    Promise.resolve(p).then(travarVertical).catch(() => mostrarToast('Este navegador não deixou abrir em tela cheia', 3500));
   };
 }
 function ligarZoom() {
@@ -546,7 +546,27 @@ function aplicarLeve() { document.body.classList.toggle('modo-leve', !!S.leve); 
 S.noturno = ler('ur-noturno', true);
 function aplicarNoturno() { document.body.classList.toggle('modo-dia', !S.noturno); }
 // Celular deitado, tablet ou computador (tela mais larga que alta): layout horizontal
-const ehPaisagem = () => { const z = ZOOM.valor, W = window.innerWidth / z, H = window.innerHeight / z; return W > H * 1.15; };
+// O jogo fica SEMPRE na vertical: o layout deitado foi desligado.
+// No celular deitado aparece o aviso para virar; em PC/tablet a tela vertical fica centralizada.
+const ehPaisagem = () => false;
+const celularDeitado = () => window.matchMedia('(pointer: coarse)').matches && window.innerWidth > window.innerHeight && window.innerHeight < 560;
+function travarVertical() {
+  try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => {}); } catch { /* navegador não deixa */ }
+}
+function avisoGirar() {
+  let d = document.querySelector('.gire-celular');
+  if (celularDeitado()) {
+    if (!d) {
+      d = document.createElement('div'); d.className = 'gire-celular'; d.setAttribute('role', 'alert');
+      d.innerHTML = '<svg width="74" height="74" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg><b>Vire o celular</b><span>O Uno Resenhas é jogado na vertical.</span>';
+      document.body.appendChild(d);
+    }
+  } else if (d) d.remove();
+}
+window.addEventListener('resize', avisoGirar);
+window.addEventListener('orientationchange', () => setTimeout(avisoGirar, 150));
+document.addEventListener('fullscreenchange', travarVertical);
+travarVertical(); setTimeout(avisoGirar, 0);
 function render() {
   document.body.classList.toggle('paisagem', ehPaisagem());
   // tela estreita (ou com muito zoom): botões do topo menores para tudo caber

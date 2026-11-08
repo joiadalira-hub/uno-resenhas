@@ -146,7 +146,7 @@ class Sala {
     this.timerVotos = null;
   }
   novoHumano(msg, conexao) {
-    return { tipo: 'humano', id: `h${this.seq++}`, nome: limpaTexto(msg.apelido, 14) || 'Jogador', avatar: avatarValido(msg.avatar), token: novoToken(), conexao, conectado: true };
+    return { tipo: 'humano', id: `h${this.seq++}`, nome: limpaTexto(msg.apelido, 14) || 'Jogador', avatar: avatarValido(msg.avatar), token: novoToken(), conexao, conectado: true, aparelho: limpaTexto(msg.aparelho, 40) || null };
   }
   novoBot(i) {
     // nome de bot que não repete nem outro bot nem o apelido de alguém da sala
@@ -501,7 +501,22 @@ function tratar(conexao, msg, ctx) {
       log('assistindo', sala.codigo, v.nome);
       return;
     }
-    const antigo = msg.token && sala.humanos().find((h) => h.token === msg.token);
+    let antigo = msg.token && sala.humanos().find((h) => h.token === msg.token);
+    if (!antigo) {
+      // quem saiu e voltou não pode aparecer duas vezes: reocupa o lugar dele
+      // 1) mesmo aparelho (vale até se a conexão antiga ainda parecer aberta); 2) mesmo apelido num lugar desconectado ou que saiu
+      const ap = limpaTexto(msg.aparelho, 40), nome = (limpaTexto(msg.apelido, 14) || '').toLowerCase();
+      antigo = (ap && sala.humanos().find((h) => h.aparelho === ap))
+        || (nome && sala.humanos().find((h) => (!h.conectado || h.saiu) && h.nome.toLowerCase() === nome));
+      if (antigo && sala.senha && msg.senha !== sala.senha) return erro(conexao, 'Senha errada.');
+      if (antigo) {
+        antigo.token = novoToken(); antigo.saiu = false;
+        if (ap) antigo.aparelho = ap;
+        if (msg.avatar) antigo.avatar = avatarValido(msg.avatar);
+        if (sala.votos && antigo.id in sala.votos && sala.votos[antigo.id] === false) delete sala.votos[antigo.id]; // tinha saído: volta a poder votar
+        log('voltou para o mesmo lugar', sala.codigo, antigo.nome);
+      }
+    }
     if (antigo) {
       if (antigo.conexao && antigo.conexao !== conexao) antigo.conexao.fechar();
       sala.voltou(antigo, conexao);

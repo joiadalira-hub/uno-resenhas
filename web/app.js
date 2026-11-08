@@ -2783,8 +2783,11 @@ async function processarFoto(arquivo) {
 
 // ================= ONLINE =================
 // Conversa com o servidor por WebSocket. O servidor guarda o jogo; aqui só mostramos e pedimos jogadas.
+// identifica este aparelho: quem sai e volta (mesmo sem o link guardado) reocupa o próprio lugar, sem ficar duplicado
+const APARELHO = (() => { let a = ler('ur-aparelho', null); if (!a) { a = Math.random().toString(36).slice(2) + Date.now().toString(36); gravar('ur-aparelho', a); } return a; })();
 function enviar(msg) {
   const o = S.online;
+  if (msg.tipo === 'entrar' || msg.tipo === 'criar') msg.aparelho = APARELHO;
   if (o && o.ws && o.ws.readyState === 1) o.ws.send(JSON.stringify(msg));
   else if (o) o.fila.push(msg);
 }

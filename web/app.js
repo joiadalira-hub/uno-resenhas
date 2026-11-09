@@ -1047,7 +1047,7 @@ function telaMesa() {
   // a mão não volta para o começo a cada toque (montando combo, comprando, etc.)
   const rolagemMao = (() => { const w = document.querySelector('.mao-wrap'); return w ? w.scrollLeft : null; })();
   app.innerHTML = `
-  <main class="mesa ${ui.distribuindo ? 'distribuindo' : ''} ${decisao ? 'decidindo' : ''}" style="--cw:${cw}px;--cw-topo:${cwTopo}px;--cor-atual:${VAR_COR[v.corAtual]}">
+  <main class="mesa ${ui.distribuindo ? 'distribuindo' : ''} ${decisao ? 'decidindo' : ''} ${ui.combo && vez ? 'montando' : ''}" style="--cw:${cw}px;--cw-topo:${cwTopo}px;--cor-atual:${VAR_COR[v.corAtual]}">
     <div class="topo-mesa">
       <button class="btn btn-icone" id="sair" aria-label="Sair da partida"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       <span style="font-size:14px;font-weight:700;color:var(--suave)">${rotRodada}</span>
@@ -1114,7 +1114,8 @@ function telaMesa() {
         return `<button class="carta ${escolhida ? 'escolhida' : ''} ${jogavel ? 'jogavel' : ''} ${apagada ? 'apagada' : ''} ${ui.treme === c.id ? 'treme' : ''}" data-carta="${c.id}" aria-label="${esc(nomeCarta(c))}${escolhida ? ', posição ' + (i + 1) : ''}">
           <img src="${imgCarta(c)}" alt="">${escolhida ? `<span class="ordem">${i + 1}</span>` : ''}</button>`;
       }).join('')}
-      </div></div>`}
+      </div></div>
+      ${ui.combo && vez && maoVista.length < mao.length ? `<div class="mao-fora" aria-label="Cartas fora do combo, que ficam na sua mão"><span class="mao-fora-rot">Ficam na mão</span><div class="mao-fora-cartas">${mao.filter((c) => !maoVista.includes(c)).map((c) => `<img src="${imgCarta(c)}" alt="${esc(nomeCarta(c))}">`).join('')}</div></div>` : ''}`}
     </div>
     <p class="aviso ${ui.erro ? 'erro' : ''}" role="status">${esc(ui.aviso)}</p>
     <div class="base-mesa">

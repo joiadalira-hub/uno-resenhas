@@ -3,7 +3,7 @@
   "short_name": "Uno Resenhas",
   "start_url": "/",
   "display": "fullscreen",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "background_color": "#10162B",
   "theme_color": "#10162B",
   "icons": [

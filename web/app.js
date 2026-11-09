@@ -14,40 +14,47 @@ const TELA_EM_PE = (() => {
     else if (typeof window.orientation === 'number') a = window.orientation;
     if (a === null) return realW() > realH() ? 90 : 0;
     a = ((a % 360) + 360) % 360;
-    return a === 90 || a === 270 ? a : 0;
+    return a === 90 || a === 270 || a === 180 ? a : 0;
   };
   function aplicar() {
     const W = realW(), H = realH();
-    const ang = toque && W > H ? angulo() : 0;
+    const a = toque ? angulo() : 0;
+    // deitado (90/270) só quando a janela está mesmo larga; de cabeça para baixo (180) com a janela em pé
+    const ang = (a === 90 || a === 270) ? (W > H ? a : 0) : a === 180 && H >= W ? 180 : 0;
     st.ang = ang; st.W = W; st.H = H;
     const raiz = document.documentElement;
     raiz.classList.toggle('girado', !!ang);
     if (ang) {
-      raiz.style.width = H + 'px'; raiz.style.height = W + 'px';
+      const deitado = ang !== 180;
+      raiz.style.width = (deitado ? H : W) + 'px'; raiz.style.height = (deitado ? W : H) + 'px';
       raiz.style.transformOrigin = '0 0';
-      raiz.style.transform = ang === 90 ? `translate(0px, ${H}px) rotate(-90deg)` : `translate(${W}px, 0px) rotate(90deg)`;
-      raiz.style.setProperty('--uvw', H / 100 + 'px'); raiz.style.setProperty('--uvh', W / 100 + 'px');
+      raiz.style.transform = ang === 90 ? `translate(0px, ${H}px) rotate(-90deg)` : ang === 270 ? `translate(${W}px, 0px) rotate(90deg)` : `translate(${W}px, ${H}px) rotate(180deg)`;
+      raiz.style.setProperty('--uvw', (deitado ? H : W) / 100 + 'px'); raiz.style.setProperty('--uvh', (deitado ? W : H) / 100 + 'px');
     } else {
       ['width', 'height', 'transform', 'transformOrigin'].forEach((k) => (raiz.style[k] = ''));
       raiz.style.removeProperty('--uvw'); raiz.style.removeProperty('--uvh');
     }
   }
   // o jogo mede a tela "em pé"
-  Object.defineProperty(window, 'innerWidth', { configurable: true, get: () => (st.ang ? st.H : realW()) });
-  Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => (st.ang ? st.W : realH()) });
+  const deitadoAgora = () => st.ang === 90 || st.ang === 270;
+  Object.defineProperty(window, 'innerWidth', { configurable: true, get: () => (deitadoAgora() ? st.H : realW()) });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => (deitadoAgora() ? st.W : realH()) });
   const ret = Element.prototype.getBoundingClientRect;
   Element.prototype.getBoundingClientRect = function () {
     const r = ret.call(this);
     if (!st.ang) return r;
     // ponto da tela -> ponto da página em pé
-    const conv = (x, y) => (st.ang === 90 ? [st.H - y, x] : [y, st.W - x]);
+    const conv = (x, y) => (st.ang === 90 ? [st.H - y, x] : st.ang === 270 ? [y, st.W - x] : [st.W - x, st.H - y]);
     const [x1, y1] = conv(r.left, r.top), [x2, y2] = conv(r.right, r.bottom);
     return new DOMRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
   };
   aplicar();
+  // alguns celulares avisam o giro antes de mudar o tamanho da janela (ou o contrário): confere de novo logo depois
+  const conferir = () => { const antes = `${st.ang}|${st.W}|${st.H}`; aplicar(); if (`${st.ang}|${st.W}|${st.H}` !== antes) window.dispatchEvent(new Event('resize')); };
+  const giro = () => { aplicar(); window.dispatchEvent(new Event('resize')); [80, 250, 600].forEach((t) => setTimeout(conferir, t)); };
   window.addEventListener('resize', aplicar);
-  window.addEventListener('orientationchange', () => setTimeout(() => { aplicar(); window.dispatchEvent(new Event('resize')); }, 120));
-  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', () => { aplicar(); window.dispatchEvent(new Event('resize')); });
+  window.addEventListener('orientationchange', giro);
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', giro);
   return st;
 })();
 // Uno Resenhas — interface (treino contra bots no navegador)
@@ -604,7 +611,7 @@ function aplicarNoturno() { document.body.classList.toggle('modo-dia', !S.noturn
 // No celular deitado aparece o aviso para virar; em PC/tablet a tela vertical fica centralizada.
 const ehPaisagem = () => false;
 function travarVertical() {
-  try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => {}); } catch { /* navegador não deixa */ }
+  try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait-primary').catch(() => {}); } catch { /* navegador não deixa */ }
 }
 document.addEventListener('fullscreenchange', travarVertical);
 travarVertical();
@@ -1025,7 +1032,7 @@ function telaMesa() {
   const larguraMao = deitado ? Math.min(W, 1400) - Math.max(130, Math.min(W * 0.18, 220)) - 56 : Math.min(W, 1100) - 40;
   // com a faixa "Ficam na mão" embaixo, as cartas do combo ficam um pouco menores para tudo caber
   const comFaixa = ui.combo && vez && maoVista.length < mao.length;
-  const cwM = comFaixa ? Math.round(cw * 0.8) : cw;
+  const cwM = comFaixa ? Math.round(cw * 0.74) : cw;
   const passoCarta = maoVista.length <= 1 ? cwM : Math.max(cwM * 0.3, Math.min(cwM * 0.86, (larguraMao - cwM) / (maoVista.length - 1)));
   const sobrepor = Math.round(passoCarta - cwM);
   // Assentos em volta da mesa oval: da esquerda, por cima, até a direita (ordem de jogo)

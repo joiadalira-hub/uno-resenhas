@@ -1031,6 +1031,10 @@ body.paisagem .supreme-tag, .baixo .supreme-tag { font-size: clamp(20px, calc(va
 .mao-fora-cartas img + img { margin-left: calc(var(--cw) * -.2); }
 .mesa.montando > .aviso { display: none; }
 .mesa.montando .mao-fora { margin-bottom: 4px; }
+/* durante a mão a tela não rola de jeito nenhum (nem puxar para atualizar) */
+html:has(body[data-tela="mesa"]), body[data-tela="mesa"] { overflow: hidden; overscroll-behavior: none; height: 100%; }
+body[data-tela="mesa"] #app { overflow: hidden; height: 100%; }
+body[data-tela="mesa"] .mesa { overflow: hidden; }
 </style>
 
 <div id="app"></div>

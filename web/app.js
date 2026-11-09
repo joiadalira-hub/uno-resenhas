@@ -998,12 +998,16 @@ function telaMesa() {
   let candidatosCombo = new Set(), seqValida = null, podeUltimaCombo = false;
   if (ui.combo && vez) {
     for (const c of mao) if (!ui.seq.includes(c.id) && validarJogada(e, EU, [...ui.seq, c.id]).ok) candidatosCombo.add(c.id);
+    // 1ª carta: só as que realmente começam um combo (têm pelo menos uma carta para vir depois)
+    if (!ui.seq.length) for (const id of [...candidatosCombo]) if (!mao.some((d) => d.id !== id && validarJogada(e, EU, [id, d.id]).ok)) candidatosCombo.delete(id);
     if (ui.seq.length) seqValida = validarJogada(e, EU, ui.seq);
     // o combo vai deixar 1 carta: dá para avisar "Última!" junto (e a animação sai numa só)
     podeUltimaCombo = !!(seqValida && seqValida.ok && !seqValida.vence && ui.seq.length === minhaMao().length - 1 && !e.disseUltima[EU]);
     if (!podeUltimaCombo) ui.comboUltima = false;
   }
   const comboDisponivel = vez && possiveis.some((p) => p.ids.length > 1);
+  // montando combo: na mão só aparecem as cartas escolhidas e as que podem entrar agora (as outras somem)
+  const maoVista = ui.combo && vez ? mao.filter((c) => ui.seq.includes(c.id) || candidatosCombo.has(c.id)) : mao;
   // Tamanho das cartas acompanha a tela (celular ou PC)
   const W = window.innerWidth / ZOOM.valor, H = window.innerHeight / ZOOM.valor;
   const deitado = ehPaisagem();
@@ -1014,7 +1018,7 @@ function telaMesa() {
   const cw = Math.round(Math.max(40, Math.min(tetoMao, (deitado ? Math.max(54, Math.min(H * 0.17, W * 0.1, 120)) : Math.max(84, Math.min(W * 0.25, H * 0.16, 150))) * ZOOM.mao)));
   const cwTopo = Math.round(Math.max(44, Math.min(tetoMesa, W * 0.3, (deitado ? Math.max(56, Math.min(H * 0.165, 130)) : Math.max(96, Math.min(W * 0.27, H * 0.16, 160))) * ZOOM.mesa)));
   const larguraMao = deitado ? Math.min(W, 1400) - Math.max(130, Math.min(W * 0.18, 220)) - 56 : Math.min(W, 1100) - 40;
-  const passoCarta = mao.length <= 1 ? cw : Math.max(cw * 0.3, Math.min(cw * 0.86, (larguraMao - cw) / (mao.length - 1)));
+  const passoCarta = maoVista.length <= 1 ? cw : Math.max(cw * 0.3, Math.min(cw * 0.86, (larguraMao - cw) / (maoVista.length - 1)));
   const sobrepor = Math.round(passoCarta - cw);
   // Assentos em volta da mesa oval: da esquerda, por cima, até a direita (ordem de jogo)
   // Regra: os lugares (fotos) e a mesa só mudam se a tela mudar de tamanho ou alguém entrar/sair.
@@ -1092,7 +1096,7 @@ function telaMesa() {
         <div class="fichas">${fichas}</div>
         ${podeUltimaCombo ? `<button type="button" class="chip-ultima" id="combo-ultima" aria-pressed="${!!ui.comboUltima}"><span class="caixa" aria-hidden="true">${ui.comboUltima ? '✓' : ''}</span>Dizer <b>Última!</b> junto com o combo</button>` : ''}</div>` : ''}
       <div class="mao-wrap"><div class="mao" style="--sobrepor:${sobrepor}px">
-      ${mao.map((c) => {
+      ${maoVista.map((c) => {
         const i = ui.seq.indexOf(c.id);
         const escolhida = ui.combo && i >= 0;
         const jogavel = vez && (ui.combo ? candidatosCombo.has(c.id) : jogaveisSozinhas.has(c.id));

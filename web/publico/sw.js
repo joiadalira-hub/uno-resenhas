@@ -1,7 +1,7 @@
 // Uno Resenhas — guarda cartas, sons e ícones no celular.
 // Sempre confere com o servidor primeiro (arte nova aparece na hora; o que não mudou volta
 // como "304", sem baixar de novo). Sem internet ou com o servidor lento, usa o que está guardado.
-const CACHE = 'uno-resenhas-v28'; // mude a versão quando trocar as artes das cartas
+const CACHE = 'uno-resenhas-v29'; // mude a versão quando trocar as artes das cartas
 const GUARDAR = /\/(cartas|cartas-min|sons)\/|\/icone-|manifest\.webmanifest$/;
 const ESPERA = 3000; // ms esperando o servidor antes de usar o guardado
 

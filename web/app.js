@@ -1,3 +1,55 @@
+// ===== O jogo nunca deita: com o celular de lado, a tela é girada de volta e continua em pé =====
+// (o navegador não deixa um site ignorar o giro do celular; então a página toda é desenhada girada, e as
+//  medidas de tela/posição que o jogo usa são convertidas para o "em pé")
+const TELA_EM_PE = (() => {
+  const desc = (k) => Object.getOwnPropertyDescriptor(window, k) || Object.getOwnPropertyDescriptor(Window.prototype, k);
+  const dW = desc('innerWidth'), dH = desc('innerHeight');
+  const realW = () => dW.get.call(window), realH = () => dH.get.call(window);
+  const toque = window.matchMedia('(pointer: coarse)').matches;
+  const st = { ang: 0, W: 0, H: 0 };
+  // pelo giro da TELA (e não pela proporção da janela: o teclado aberto deixa a janela "larga" com o celular em pé)
+  const angulo = () => {
+    let a = null;
+    if (screen.orientation && typeof screen.orientation.angle === 'number') a = screen.orientation.angle;
+    else if (typeof window.orientation === 'number') a = window.orientation;
+    if (a === null) return realW() > realH() ? 90 : 0;
+    a = ((a % 360) + 360) % 360;
+    return a === 90 || a === 270 ? a : 0;
+  };
+  function aplicar() {
+    const W = realW(), H = realH();
+    const ang = toque && W > H ? angulo() : 0;
+    st.ang = ang; st.W = W; st.H = H;
+    const raiz = document.documentElement;
+    raiz.classList.toggle('girado', !!ang);
+    if (ang) {
+      raiz.style.width = H + 'px'; raiz.style.height = W + 'px';
+      raiz.style.transformOrigin = '0 0';
+      raiz.style.transform = ang === 90 ? `translate(0px, ${H}px) rotate(-90deg)` : `translate(${W}px, 0px) rotate(90deg)`;
+      raiz.style.setProperty('--uvw', H / 100 + 'px'); raiz.style.setProperty('--uvh', W / 100 + 'px');
+    } else {
+      ['width', 'height', 'transform', 'transformOrigin'].forEach((k) => (raiz.style[k] = ''));
+      raiz.style.removeProperty('--uvw'); raiz.style.removeProperty('--uvh');
+    }
+  }
+  // o jogo mede a tela "em pé"
+  Object.defineProperty(window, 'innerWidth', { configurable: true, get: () => (st.ang ? st.H : realW()) });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => (st.ang ? st.W : realH()) });
+  const ret = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function () {
+    const r = ret.call(this);
+    if (!st.ang) return r;
+    // ponto da tela -> ponto da página em pé
+    const conv = (x, y) => (st.ang === 90 ? [st.H - y, x] : [y, st.W - x]);
+    const [x1, y1] = conv(r.left, r.top), [x2, y2] = conv(r.right, r.bottom);
+    return new DOMRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+  };
+  aplicar();
+  window.addEventListener('resize', aplicar);
+  window.addEventListener('orientationchange', () => setTimeout(() => { aplicar(); window.dispatchEvent(new Event('resize')); }, 120));
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', () => { aplicar(); window.dispatchEvent(new Event('resize')); });
+  return st;
+})();
 // Uno Resenhas — interface (treino contra bots no navegador)
 // Usa o motor (cartas.js, regras.js, bot.js), que é colado antes deste arquivo no build.
 
@@ -549,24 +601,11 @@ function aplicarNoturno() { document.body.classList.toggle('modo-dia', !S.noturn
 // O jogo fica SEMPRE na vertical: o layout deitado foi desligado.
 // No celular deitado aparece o aviso para virar; em PC/tablet a tela vertical fica centralizada.
 const ehPaisagem = () => false;
-const celularDeitado = () => window.matchMedia('(pointer: coarse)').matches && window.innerWidth > window.innerHeight && window.innerHeight < 560;
 function travarVertical() {
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => {}); } catch { /* navegador não deixa */ }
 }
-function avisoGirar() {
-  let d = document.querySelector('.gire-celular');
-  if (celularDeitado()) {
-    if (!d) {
-      d = document.createElement('div'); d.className = 'gire-celular'; d.setAttribute('role', 'alert');
-      d.innerHTML = '<svg width="74" height="74" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg><b>Vire o celular</b><span>O Uno Resenhas é jogado na vertical.</span>';
-      document.body.appendChild(d);
-    }
-  } else if (d) d.remove();
-}
-window.addEventListener('resize', avisoGirar);
-window.addEventListener('orientationchange', () => setTimeout(avisoGirar, 150));
 document.addEventListener('fullscreenchange', travarVertical);
-travarVertical(); setTimeout(avisoGirar, 0);
+travarVertical();
 function render() {
   document.body.classList.toggle('paisagem', ehPaisagem());
   // tela estreita (ou com muito zoom): botões do topo menores para tudo caber
@@ -2464,7 +2503,7 @@ function abrirConfigSala() {
   const fundo = document.createElement('div');
   fundo.className = 'fundo-modal fundo-config';
   const desenhar = () => {
-    fundo.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Regras da sala" style="max-height:85vh;overflow-y:auto">
+    fundo.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Regras da sala" style="max-height:calc(var(--uvh) * 85);overflow-y:auto">
       <h2 style="font-size:24px">Regras da sala</h2>
       <span class="ajuda" style="margin-top:-8px">${S.e && S.e.fase !== 'jogando' ? 'Valem a partir da próxima mão.' : 'Valem a partir da primeira mão.'}</span>
       <span style="font-weight:700">Modo de jogo</span>
@@ -3087,7 +3126,7 @@ function telaEntrar() {
 function telaEspera() {
   const o = S.online, sala = o && o.sala;
   if (!sala && o && o.recriando) {
-    app.innerHTML = `<main class="tela"><div class="bloco" style="align-items:center;text-align:center;gap:10px;margin-top:20vh">
+    app.innerHTML = `<main class="tela"><div class="bloco" style="align-items:center;text-align:center;gap:10px;margin-top:calc(var(--uvh) * 20)">
       <h2 style="font-size:24px;color:var(--destaque)">O servidor reiniciou</h2>
       <span style="color:var(--suave)">As salas foram apagadas. ${o.recriando.dono ? 'Recriando a sua sala com o mesmo link…' : 'Esperando o dono recriar a sala para você entrar de novo…'}</span>
       <span class="ajuda">O placar da partida anterior se perdeu.</span></div>

@@ -1035,6 +1035,8 @@ body.paisagem .supreme-tag, .baixo .supreme-tag { font-size: clamp(20px, calc(va
 html:has(body[data-tela="mesa"]), body[data-tela="mesa"] { overflow: hidden; overscroll-behavior: none; height: 100%; }
 body[data-tela="mesa"] #app { overflow: hidden; height: 100%; }
 body[data-tela="mesa"] .mesa { overflow: hidden; }
+/* montando combo: o painel fica um pouco mais alto, sobre a mesa */
+.mesa.montando .painel-combo { bottom: calc(100% + var(--cw, 76px) * 0.35); }
 </style>
 
 <div id="app"></div>

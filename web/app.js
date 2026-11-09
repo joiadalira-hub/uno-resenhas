@@ -1032,7 +1032,9 @@ function telaMesa() {
   const larguraMao = deitado ? Math.min(W, 1400) - Math.max(130, Math.min(W * 0.18, 220)) - 56 : Math.min(W, 1100) - 40;
   // com a faixa "Ficam na mão" embaixo, as cartas do combo ficam um pouco menores para tudo caber
   const comFaixa = ui.combo && vez && maoVista.length < mao.length;
-  const cwM = comFaixa ? Math.round(cw * 0.74) : cw;
+  const cwM = cw; // as cartas do combo ficam do mesmo tamanho da mão
+  // a faixa ganha espaço encolhendo a mesa (e não as cartas), para nada rolar
+  const alturaFaixa = comFaixa ? Math.max(0, Math.round(cw * 0.52 * 1.54 + 14) - 46) : 0; // (a linha de aviso some enquanto monta o combo: devolve ~46 px)
   const passoCarta = maoVista.length <= 1 ? cwM : Math.max(cwM * 0.3, Math.min(cwM * 0.86, (larguraMao - cwM) / (maoVista.length - 1)));
   const sobrepor = Math.round(passoCarta - cwM);
   // Assentos em volta da mesa oval: da esquerda, por cima, até a direita (ordem de jogo)
@@ -1068,7 +1070,7 @@ function telaMesa() {
         ${temRelogio() ? `<span class="relogio ${vez && restam !== null ? (restam <= 5 ? 'urgente' : 'ativo') : ''}" id="relogio" aria-live="off">${vez && restam !== null ? restam + ' s' : '—'}</span>` : ''}
       </span>
     </div>
-    <div class="arena" ${fixo ? `style="flex:none;height:${fixo.h}px"` : ''}>
+    <div class="arena" ${fixo ? `style="flex:none;height:${Math.max(170, fixo.h - alturaFaixa)}px"` : ''}>
       <div class="feltro" aria-hidden="true"><svg class="gravado" viewBox="0 0 600 150" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="gGrav" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE68A"/><stop offset=".55" stop-color="#E9B23A"/><stop offset="1" stop-color="#B9791C"/></linearGradient><path id="arcoGrav" d="M 40 120 Q 300 0 560 120"/></defs><g class="grav-sombra"><text><textPath href="#arcoGrav" startOffset="44%" text-anchor="middle">Resenhas</textPath></text><g transform="translate(524 82) rotate(8) scale(1.3)">${CARINHA}</g></g><g class="grav-ouro"><text><textPath href="#arcoGrav" startOffset="44%" text-anchor="middle">Resenhas</textPath></text><g transform="translate(524 82) rotate(8) scale(1.3)">${CARINHA}</g></g></svg></div>
       ${assentos.map(({ j, x, y }) => `<div class="assento ${j.id === v.vez ? 'vez' : ''} ${caiuDaSala(j.id) ? 'caiu' : ''} ${estaNaCall(j.id) ? 'na-call' : ''} ${cartasVisiveis(j) === 1 ? 'uma' : ''} ${v.regra9 && v.regra9.apertaram.includes(j.id) ? 'apertou9' : ''}" data-id="${j.id}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;--cor-jog:${corDoJogador(j.id)}">
         ${j.id === v.vez ? '<span class="selo-vez">Jogando</span>' : ''}

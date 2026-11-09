@@ -1023,8 +1023,11 @@ function telaMesa() {
   const cw = Math.round(Math.max(40, Math.min(tetoMao, (deitado ? Math.max(54, Math.min(H * 0.17, W * 0.1, 120)) : Math.max(84, Math.min(W * 0.25, H * 0.16, 150))) * ZOOM.mao)));
   const cwTopo = Math.round(Math.max(44, Math.min(tetoMesa, W * 0.3, (deitado ? Math.max(56, Math.min(H * 0.165, 130)) : Math.max(96, Math.min(W * 0.27, H * 0.16, 160))) * ZOOM.mesa)));
   const larguraMao = deitado ? Math.min(W, 1400) - Math.max(130, Math.min(W * 0.18, 220)) - 56 : Math.min(W, 1100) - 40;
-  const passoCarta = maoVista.length <= 1 ? cw : Math.max(cw * 0.3, Math.min(cw * 0.86, (larguraMao - cw) / (maoVista.length - 1)));
-  const sobrepor = Math.round(passoCarta - cw);
+  // com a faixa "Ficam na mão" embaixo, as cartas do combo ficam um pouco menores para tudo caber
+  const comFaixa = ui.combo && vez && maoVista.length < mao.length;
+  const cwM = comFaixa ? Math.round(cw * 0.8) : cw;
+  const passoCarta = maoVista.length <= 1 ? cwM : Math.max(cwM * 0.3, Math.min(cwM * 0.86, (larguraMao - cwM) / (maoVista.length - 1)));
+  const sobrepor = Math.round(passoCarta - cwM);
   // Assentos em volta da mesa oval: da esquerda, por cima, até a direita (ordem de jogo)
   // Regra: os lugares (fotos) e a mesa só mudam se a tela mudar de tamanho ou alguém entrar/sair.
   // Nenhuma animação, painel ou botão mexe neles.
@@ -1105,7 +1108,7 @@ function telaMesa() {
         <button class="btn decisao-op comprar" id="comprar"><b>Comprar ${v.compraPendente.quantidade}</b><small>Aceita e compra as cartas</small></button>
         <button class="btn decisao-op desafiar" id="desafiar"><b>Desafiar</b><small>Se quem jogou tinha carta da cor, ele compra ${v.compraPendente.quantidade}. Se não tinha, você compra ${v.compraPendente.quantidade + 2}.</small></button>
         <span class="ajuda decisao-mao">Você tem ${mao.length} ${mao.length === 1 ? 'carta' : 'cartas'} na mão.</span>
-      </div>` : `<div class="mao-wrap"><div class="mao" style="--sobrepor:${sobrepor}px">
+      </div>` : `<div class="mao-wrap" ${comFaixa ? `style="--cw:${cwM}px"` : ''}><div class="mao" style="--sobrepor:${sobrepor}px">
       ${maoVista.map((c) => {
         const i = ui.seq.indexOf(c.id);
         const escolhida = ui.combo && i >= 0;

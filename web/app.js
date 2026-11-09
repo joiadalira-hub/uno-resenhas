@@ -612,6 +612,62 @@ function aplicarNoturno() { document.body.classList.toggle('modo-dia', !S.noturn
 // O jogo fica SEMPRE na vertical: o layout deitado foi desligado.
 // No celular deitado aparece o aviso para virar; em PC/tablet a tela vertical fica centralizada.
 const ehPaisagem = () => false;
+// ---------- "Instalar app": aparece na tela inicial para quem joga pelo navegador ----------
+let pedidoInstalar = null; // Android/Chrome: o navegador deixa mostrar a janela de instalar
+window.addEventListener('beforeinstallprompt', (ev) => { ev.preventDefault(); pedidoInstalar = ev; if (S.tela === 'inicio') render(); });
+window.addEventListener('appinstalled', () => { pedidoInstalar = null; if (S.tela === 'inicio') render(); });
+const jaInstalado = () => window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+const ehIphone = () => document.documentElement.classList.contains('ios');
+const ehCelular = () => window.matchMedia('(pointer: coarse)').matches;
+function htmlInstalar() {
+  if (jaInstalado() || !ehCelular()) return '';
+  const fechado = ler('ur-instalar-fechado', 0);
+  if (fechado && Date.now() - fechado < 3 * 24 * 3600 * 1000) return ''; // "agora não": volta em 3 dias
+  return `<div class="nota-instalar">
+    <span class="ni-icone" aria-hidden="true"><img src="/icone-192.png" alt=""></span>
+    <span class="ni-texto"><b>Instale o app</b><small>Abre em tela cheia, mais rápido e direto da tela inicial</small></span>
+    <button type="button" class="btn btn-principal" id="instalar-app">Instalar</button>
+    <button type="button" class="ni-fechar" id="instalar-fechar" aria-label="Agora não">✕</button>
+  </div>`;
+}
+function ligarInstalar() {
+  const b = document.getElementById('instalar-app'), f = document.getElementById('instalar-fechar');
+  if (f) f.onclick = () => { gravar('ur-instalar-fechado', Date.now()); render(); };
+  if (!b) return;
+  b.onclick = async () => {
+    if (pedidoInstalar) {
+      // Android: a janela de instalar do próprio celular
+      pedidoInstalar.prompt();
+      try { const r = await pedidoInstalar.userChoice; if (r && r.outcome === 'accepted') pedidoInstalar = null; } catch { /* ignora */ }
+      return render();
+    }
+    abrirComoInstalar();
+  };
+}
+function abrirComoInstalar() {
+  const ios = ehIphone();
+  const naoSafari = ios && /CriOS|FxiOS|EdgiOS|Instagram|FBAN|FBAV|WhatsApp/i.test(navigator.userAgent);
+  const passos = ios
+    ? [naoSafari ? 'Abra este jogo no <b>Safari</b> (copie o link e cole no Safari).' : 'Você já está no Safari: ótimo.',
+      'Toque em <b>Compartilhar</b> <span class="ni-ico">⬆︎</span> (o quadrado com a seta para cima, na barra de baixo).',
+      'Role e toque em <b>Adicionar à Tela de Início</b> <span class="ni-ico">＋</span>.',
+      'Toque em <b>Adicionar</b>. Depois abra sempre pelo ícone do Uno Resenhas.']
+    : ['Toque no menu do navegador <span class="ni-ico">⋮</span> (os três pontinhos, no canto de cima).',
+      'Escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.',
+      'Confirme em <b>Instalar</b>. Depois abra sempre pelo ícone do Uno Resenhas.'];
+  const f = document.createElement('div');
+  f.className = 'fundo-modal';
+  f.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Como instalar o app">
+    <h2 style="font-size:22px">Instalar o Uno Resenhas</h2>
+    <ol class="ni-passos">${passos.map((p) => `<li>${p}</li>`).join('')}</ol>
+    ${ios ? '<p class="ajuda" style="margin:0">Dica: para a tela não girar no iPhone, ligue o cadeado de rotação na Central de Controle.</p>' : ''}
+    <button class="btn btn-principal" id="ni-ok">Entendi</button>
+  </div>`;
+  document.body.appendChild(f);
+  const fechar = () => f.remove();
+  f.querySelector('#ni-ok').onclick = fechar;
+  f.addEventListener('pointerdown', (ev) => { if (ev.target === f) fechar(); });
+}
 function travarVertical() {
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait-primary').catch(() => {}); } catch { /* navegador não deixa */ }
 }
@@ -681,9 +737,11 @@ function telaInicio() {
       ${S.temServidor === false ? '<p class="ajuda" style="margin:0;text-align:center">O jogo online funciona no site do jogo (depois de publicado). Aqui dá para treinar contra os bots.</p>' : ''}
       <button class="btn btn-grande" type="submit" style="min-height:56px;font-size:18px"><svg width="26" height="24" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="20" height="14" rx="5"/><path d="M13 7V3"/><circle cx="13" cy="2.5" r="1.5" fill="currentColor"/><circle cx="9.5" cy="14" r="1.6" fill="currentColor"/><circle cx="16.5" cy="14" r="1.6" fill="currentColor"/><path d="M1 13v3M25 13v3"/></svg>Treinar contra bots</button>
       ${S.erroInicio ? `<p class="aviso" role="status" style="height:auto;white-space:normal">${esc(S.erroInicio)}</p>` : ''}
+      ${htmlInstalar()}
     </form>
   </main>`;
   S.erroInicio = null;
+  ligarInstalar();
   ligarBotaoSom();
   ligarSalasAbertas();
   ligarEscolhaDeck(app);

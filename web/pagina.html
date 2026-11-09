@@ -1046,6 +1046,16 @@ html.ios body[data-tela="mesa"] .fx-fundo .varredura { display: none; }
 html.ios .carta img, html.ios .topo-pilha img:not(.final-vira):not(.some-depois):not(.pinta), html.ios .combo-carta img, html.ios .mao-fora-cartas img {
   -webkit-backface-visibility: hidden; backface-visibility: hidden; -webkit-transform: translateZ(0); transform: translateZ(0); }
 html.ios .assento img, html.ios .monte img, html.ios .topo-pilha img { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+/* nota "Instalar app" na tela inicial */
+.nota-instalar { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: 18px; background: linear-gradient(135deg, rgba(255,212,59,.16), rgba(120,140,255,.14)); border: 1.5px solid rgba(255,212,59,.55); min-width: 0; }
+.ni-icone img { width: 42px; height: 42px; border-radius: 11px; display: block; box-shadow: 0 4px 10px rgba(0,0,0,.4); }
+.ni-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ni-texto b { font: 800 16px var(--display); }
+.ni-texto small { color: var(--suave); font-size: 12.5px; line-height: 1.25; }
+.nota-instalar .btn { flex: none; min-height: 42px; padding: 0 14px; font-size: 15px; }
+.ni-fechar { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: transparent; color: var(--suave); font-size: 16px; cursor: pointer; }
+.ni-passos { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 1.35; }
+.ni-ico { display: inline-block; padding: 0 6px; border-radius: 6px; background: var(--chao); border: 1px solid var(--borda); font-weight: 800; }
 </style>
 
 <div id="app"></div>

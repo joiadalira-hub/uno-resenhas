@@ -963,6 +963,48 @@ body.paisagem .supreme-tag, .baixo .supreme-tag { font-size: clamp(20px, calc(va
   .lugar { padding: 0 6px 0 10px; font-size: 14px; }
   .lugar b { padding: 4px 7px; font-size: 12px; }
 }
+/* conexão: faixa de reconectando e quem está ausente na mesa */
+.sinal-conexao { position: fixed; left: 50%; top: max(8px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 70; display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: rgba(14,20,52,.95); border: 1.5px solid var(--destaque); font: 700 14px var(--corpo); box-shadow: 0 8px 20px rgba(0,0,0,.5); }
+.sinal-conexao i { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid var(--destaque); border-top-color: transparent; animation: gira-sinal .8s linear infinite; }
+@keyframes gira-sinal { to { transform: rotate(360deg); } }
+.assento.caiu .avatar { position: relative; }
+.assento.caiu .avatar::after { content: "💤"; position: absolute; right: -6px; top: -8px; font-size: 18px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.6)); }
+.assento.caiu .placa::after { content: " · ausente"; }
+/* Regras da sala → lugares e ordem */
+.aviso-retomar { margin: 0; padding: 10px 14px; border-radius: 14px; background: rgba(255,212,59,.1); border: 1.5px solid rgba(255,212,59,.5); font-size: 14px; }
+.lg-lista { display: flex; flex-direction: column; gap: 6px; }
+.lg-linha { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 6px 8px; border-radius: 14px; background: var(--chao); border: 1.5px solid var(--borda); min-width: 0; }
+.lg-linha.aberto { border-style: dashed; }
+.lg-linha.ausente { opacity: .7; }
+.lg-setas { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.lg-setas button { width: 30px; height: 22px; border-radius: 7px; border: 1.5px solid var(--borda); background: var(--superficie); color: var(--texto); font-size: 11px; line-height: 1; cursor: pointer; }
+.lg-setas button:disabled { opacity: .3; cursor: default; }
+.lg-pos { flex: none; width: 24px; font: 800 14px var(--display); color: var(--cor-jog, var(--suave)); text-align: center; }
+.lg-linha .avatar.pequeno { flex: none; width: 34px; height: 34px; }
+.lg-nome { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lg-nome b, .lg-nome small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-nome small { color: var(--suave); font-size: 12px; }
+.lg-acoes { flex: 0 1 auto; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 46%; }
+.lg-nome { flex: 1 1 70px; }
+.lg-acao { padding: 6px 9px; border-radius: 10px; border: 1.5px solid var(--borda); background: var(--superficie); color: var(--texto); font: 700 12px var(--corpo); cursor: pointer; white-space: nowrap; }
+.lg-acao.perigo { border-color: rgba(242,69,61,.6); color: #FF9C95; }
+.lg-acao.confirma { background: var(--perigo); color: #fff; border-color: var(--perigo); }
+.lg-rodape { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.lg-rodape .btn { min-height: 44px; font-size: 14px; padding: 0 6px; }
+.lg-rodape .btn b { color: var(--destaque); margin-right: 4px; }
+/* chat */
+.btn-chat { position: relative; }
+.chat-bolinha { position: absolute; top: -5px; right: -5px; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--perigo); color: #fff; font: 800 11px/20px var(--corpo); text-align: center; }
+.chat-painel { width: 100%; max-width: 460px; box-sizing: border-box; height: min(calc(var(--uvh) * 80), 620px); display: flex; flex-direction: column; gap: 10px; }
+.chat-lista { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px; }
+.chat-msg { align-self: flex-start; max-width: 84%; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 14px 14px 14px 4px; background: var(--chao); border: 1.5px solid var(--borda); overflow-wrap: anywhere; }
+.chat-msg b { color: var(--cor-jog); font-size: 13px; }
+.chat-msg small { color: var(--suave); font-size: 11px; align-self: flex-end; }
+.chat-msg.minha { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: rgba(255,212,59,.12); border-color: rgba(255,212,59,.45); }
+.chat-rapidas { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.chat-rapidas button { flex: none; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--borda); background: var(--chao); color: var(--texto); font: 700 14px var(--corpo); cursor: pointer; }
+.chat-envio { display: flex; gap: 8px; flex: none; }
+.chat-envio input { flex: 1; min-width: 0; min-height: 46px; }
 </style>
 
 <div id="app"></div>

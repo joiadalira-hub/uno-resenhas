@@ -607,6 +607,7 @@ function travarVertical() {
 document.addEventListener('fullscreenchange', travarVertical);
 travarVertical();
 function render() {
+  fecharChatNaMao();
   document.body.classList.toggle('paisagem', ehPaisagem());
   // tela estreita (ou com muito zoom): botões do topo menores para tudo caber
   document.body.classList.toggle('apertado', window.innerWidth / ZOOM.valor < 400);
@@ -1228,7 +1229,8 @@ function renderModal() {
       <button class="btn btn-principal" id="ok-zero" ${m.alvo ? '' : 'disabled'}>Confirmar</button>`;
   }
   if (m.tipo === 'espiada') corpo = `<h2 style="font-size:24px">Mão de ${esc(nomeJog(m.alvo).replace('Bot ', ''))}</h2><div class="espiadas">${m.mao.map((c) => `<img src="${imgCarta(c)}" alt="${esc(nomeCarta(c))}">`).join('')}</div><button class="btn btn-principal" id="fechar">Fechar</button>`;
-  if (m.tipo === 'sair') corpo = `<h2 style="font-size:24px">Sair da partida?</h2><p style="margin:0;color:var(--suave)">${S.online ? 'Um bot joga no seu lugar até o fim da mão e depois você sai da mesa.' : 'O placar desta partida será perdido.'}</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><button class="btn" id="fechar">Continuar jogando</button><button class="btn btn-perigo" id="confirmar-sair">Sair</button></div>`;
+  if (m.tipo === 'sair' && S.online && souDonoDaSala() && S.e && S.e.fase === 'jogando') corpo = `<h2 style="font-size:24px">Encerrar ou sair?</h2><p style="margin:0;color:var(--suave)"><b>Encerrar mão:</b> a mão acaba agora sem contar pontos e todos voltam para a sala; o placar da partida continua.</p><button class="btn btn-principal" id="encerrar-mao">Encerrar mão</button><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><button class="btn" id="fechar">Continuar jogando</button><button class="btn btn-perigo" id="confirmar-sair">Sair da partida</button></div>`;
+  else if (m.tipo === 'sair') corpo = `<h2 style="font-size:24px">Sair da partida?</h2><p style="margin:0;color:var(--suave)">${S.online ? 'Um bot joga no seu lugar até o fim da mão e depois você sai da mesa.' : 'O placar desta partida será perdido.'}</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><button class="btn" id="fechar">Continuar jogando</button><button class="btn btn-perigo" id="confirmar-sair">Sair</button></div>`;
   // escolha da jogada (cor, Regra do 5, Zero): dá para voltar e escolher outra jogada
   const voltar = ['cor', 'cor5', 'zero'].includes(m.tipo) ? '<button class="btn btn-voltar-jogada" id="voltar-jogada"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Voltar e escolher outra jogada</button>' : '';
   return `<div class="fundo-modal"><div class="modal" role="dialog" aria-modal="true">${corpo}${voltar}</div></div>`;
@@ -1249,6 +1251,8 @@ function ligarModal() {
   if (okZero) okZero.onclick = () => { m.acao.zero = { efeito: m.efeito === 'espiar' ? 'espiar' : 'trocar', alvo: m.alvo }; S.ui.modal = null; seguirPassos(m.acao, m.resto); };
   const f = document.getElementById('fechar');
   if (f) f.onclick = fechar;
+  const em = document.getElementById('encerrar-mao');
+  if (em) em.onclick = () => { S.ui.modal = null; enviar({ tipo: 'encerrar' }); render(); };
   const cs = document.getElementById('confirmar-sair');
   if (cs) cs.onclick = () => { document.querySelectorAll('.palco').forEach((x) => x.remove()); if (S.online) return sairDaSala(); pararTimers(); S.tela = 'inicio'; S.e = null; render(); };
 }
@@ -2367,6 +2371,7 @@ function telaFim() {
   const votou = ui.votoEnviado !== undefined;
   app.innerHTML = `
   <main class="tela">
+    ${S.online ? `<div class="linha" style="justify-content:flex-end;margin-bottom:-12px">${botaoChat()}</div>` : ''}
     <div class="bloco" style="align-items:center;text-align:center;gap:6px">
       <span class="rotulo">${rotulo}</span>
       <h1 class="titulo-vitoria">${acabou ? `${esc(placarGeral[0].jogador === EU ? 'Você venceu' : placarGeral[0].nome.replace('Bot ', '') + ' venceu')} a partida!` : venc ? `${esc(venc === 'Você' ? 'Você venceu' : venc + ' venceu')}!` : 'Morte súbita!'}</h1>
@@ -2385,6 +2390,7 @@ function telaFim() {
           <p class="ajuda" style="margin:0">${ui.voto === false ? 'Votando Não, você sai da mesa.' : 'Quem votar Não sai da mesa; o jogo segue com quem ficou.'}</p>
           <button class="btn btn-principal" id="ok-voto" ${ui.voto === undefined ? 'disabled' : ''}>OK</button>`}
       <div class="votos" id="votos">${htmlVotos()}</div>
+      ${dono && S.online ? `<button class="btn btn-principal" id="forcar-proxima">${acabou ? 'Começar outra partida agora' : 'Começar a próxima mão agora'}</button><p class="ajuda" style="margin:-4px 0 0;text-align:center">A próxima mão só começa quando todos votarem ou quando você tocar aqui (quem não votou e está conectado continua; quem caiu sai).</p>` : ''}
     </section>
     ${S.online && S.online.sala && (aberta || S.online.sala.assentos.some((a) => a.tipo === 'aberto')) ? htmlConvite(S.online.sala) : ''}
     <div class="fim-botoes">
@@ -2396,6 +2402,8 @@ function telaFim() {
   const $ = (id) => document.getElementById(id);
   ligarConvite();
   ligarVotos();
+  ligarChat();
+  if ($('forcar-proxima')) $('forcar-proxima').onclick = () => { $('forcar-proxima').disabled = true; enviar({ tipo: 'proxima' }); };
   if ($('config-sala')) $('config-sala').onclick = abrirConfigSala;
   if ($('voto-sim')) $('voto-sim').onclick = () => { ui.voto = true; telaFim(); };
   if ($('voto-nao')) $('voto-nao').onclick = () => { ui.voto = false; telaFim(); };
@@ -2439,6 +2447,131 @@ function ligarConvite() {
     try { await navigator.clipboard.writeText(texto); comp.textContent = 'Convite copiado!'; } catch { comp.textContent = 'Use o Copiar'; }
   };
 }
+// ---------- Regras da sala → Lugares e ordem da vez (online) ----------
+function htmlLugaresGerencia(sala) {
+  const dono = sala.dono === EU;
+  const pode = sala.fase === 'espera' || !!(S.e && S.e.fase !== 'jogando');
+  const n = sala.assentos.length;
+  const silenciados = new Set(sala.silenciados || []);
+  const linhas = sala.assentos.map((a, i) => {
+    const voce = a.id === EU;
+    const nome = a.tipo === 'aberto' ? 'Lugar vago' : a.nome.replace('Bot ', '') + (voce ? ' (você)' : '');
+    const st = a.tipo === 'aberto' ? 'esperando um amigo pelo link'
+      : a.tipo === 'bot' ? (a.sai ? 'bot · sai na próxima mão' : a.pendente ? 'bot · entra na próxima mão' : 'bot')
+      : [a.id === sala.dono ? 'dono' : '', a.conectado ? '' : 'ausente', a.pendente ? 'entra na próxima mão' : '', a.sai ? 'sai na próxima mão' : '', silenciados.has(a.id) ? 'silenciado no chat' : ''].filter(Boolean).join(' · ') || 'conectado';
+    const av = a.tipo === 'aberto' ? '<span class="inicial">+</span>' : a.avatar || (voce && S.avatar) ? `<img class="figurinha" src="${voce && S.avatar ? S.avatar : a.avatar}" alt="">` : `<span class="inicial">${esc(a.nome.replace('Bot ', '')[0].toUpperCase())}</span>`;
+    let acoes = '';
+    if (dono) {
+      if (a.tipo === 'aberto' && pode) acoes = `<button type="button" class="lg-acao" data-lg="bot" data-i="${i}">Pôr bot</button><button type="button" class="lg-acao" data-lg="tirar" data-i="${i}" aria-label="Tirar este lugar">✕</button>`;
+      else if (a.tipo === 'bot' && pode) acoes = `<button type="button" class="lg-acao" data-lg="bot" data-i="${i}">${a.sai ? 'Manter' : 'Tirar bot'}</button>`;
+      else if (a.tipo === 'humano' && !voce) acoes = `${a.conectado ? `<button type="button" class="lg-acao" data-lg="dono" data-id="${a.id}" aria-label="Tornar dono da sala">👑 Dono</button>` : ''}<button type="button" class="lg-acao" data-lg="silenciar" data-id="${a.id}" aria-label="${silenciados.has(a.id) ? 'Liberar no chat' : 'Silenciar no chat'}">${silenciados.has(a.id) ? '🔊' : '🔇'}</button><button type="button" class="lg-acao perigo" data-lg="expulsar" data-id="${a.id}">Tirar</button>`;
+    }
+    const setas = dono && pode ? `<span class="lg-setas"><button type="button" data-lg="mover" data-i="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Subir">▲</button><button type="button" data-lg="mover" data-i="${i}" data-dir="1" ${i === n - 1 ? 'disabled' : ''} aria-label="Descer">▼</button></span>` : '';
+    return `<div class="lg-linha ${a.tipo} ${a.tipo === 'humano' && !a.conectado ? 'ausente' : ''}" style="--cor-jog:${CORES_JOG[i % CORES_JOG.length]}">
+      ${setas}<span class="lg-pos">${i + 1}º</span><span class="avatar pequeno">${av}</span>
+      <span class="lg-nome"><b>${esc(nome)}</b><small>${esc(st)}</small></span>
+      <span class="lg-acoes">${acoes}</span></div>`;
+  }).join('');
+  const rodape = dono && pode
+    ? `<div class="lg-rodape"><button type="button" class="btn" data-lg="mais" ${n >= 10 ? 'disabled' : ''}><b aria-hidden="true">+</b> Adicionar lugar</button><button type="button" class="btn" data-lg="embaralhar">🔀 Embaralhar ordem</button></div>`
+    : '';
+  const nota = !pode ? 'Durante a mão a mesa fica como está: lugares e ordem mudam entre as mãos (dá para tirar alguém ou passar o posto de dono a qualquer hora).'
+    : 'A ordem da lista é a ordem da vez (o 1º joga, depois o 2º…). Quem começa cada mão é sorteado.';
+  return `<div class="lg-lista">${linhas}</div>${rodape}<p class="ajuda" style="margin:0">${nota}</p>`;
+}
+function ligarLugaresGerencia(raiz) {
+  const box = raiz.querySelector('#cfg-lugares');
+  if (!box || box.dataset.ligado) return;
+  box.dataset.ligado = '1';
+  box.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-lg]');
+    if (!b || b.disabled) return;
+    const t = b.dataset.lg;
+    if (t === 'mover') enviar({ tipo: 'mover', indice: Number(b.dataset.i), dir: Number(b.dataset.dir) });
+    else if (t === 'embaralhar') enviar({ tipo: 'embaralhar' });
+    else if (t === 'mais') enviar({ tipo: 'lugares', delta: 1 });
+    else if (t === 'bot') enviar({ tipo: 'lugar', indice: Number(b.dataset.i) });
+    else if (t === 'tirar') enviar({ tipo: 'tirarLugar', indice: Number(b.dataset.i) });
+    else if (t === 'silenciar') enviar({ tipo: 'silenciar', id: b.dataset.id });
+    else if (t === 'dono' || t === 'expulsar') {
+      // ação séria: toca duas vezes para confirmar
+      if (!b.classList.contains('confirma')) { box.querySelectorAll('.confirma').forEach((x) => { x.classList.remove('confirma'); x.textContent = x.dataset.txt; }); b.dataset.txt = b.textContent; b.classList.add('confirma'); b.textContent = 'Confirmar?'; return; }
+      enviar(t === 'dono' ? { tipo: 'dono', id: b.dataset.id } : { tipo: 'expulsar', id: b.dataset.id });
+    }
+  });
+}
+function atualizarLugaresConfig() {
+  const box = document.getElementById('cfg-lugares');
+  if (box && S.online && S.online.sala) {
+    if (S.online.sala.dono !== EU && document.querySelector('.fundo-config')) { /* deixou de ser dono: só vê */ }
+    box.innerHTML = htmlLugaresGerencia(S.online.sala);
+  }
+}
+
+// ---------- Chat de texto da sala (na espera e entre as mãos; durante a mão fica só a call de voz) ----------
+const CHAT = { msgs: [], naoLidas: 0, aberto: false };
+const RAPIDAS = ['😂', '🔥', '😏', '👏', 'GG', 'Bora!', 'Revanche?', 'Sorte!'];
+const chatDisponivel = () => !!(S.online && S.online.sala && (S.tela === 'espera' || S.tela === 'fim' || S.tela === 'arte'));
+function botaoChat() {
+  if (!S.online) return '';
+  return `<button class="btn btn-icone btn-chat" id="abrir-chat" aria-label="Chat da sala${CHAT.naoLidas ? ` (${CHAT.naoLidas} novas)` : ''}"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.5-4.6A8 8 0 1 1 21 12z"/></svg>${CHAT.naoLidas ? `<span class="chat-bolinha">${CHAT.naoLidas > 9 ? '9+' : CHAT.naoLidas}</span>` : ''}</button>`;
+}
+function ligarChat() { const b = document.getElementById('abrir-chat'); if (b) b.onclick = abrirChat; }
+function receberChat(m) {
+  if (m.todas) CHAT.msgs = m.todas.slice();
+  else if (m.msg) {
+    CHAT.msgs.push(m.msg); if (CHAT.msgs.length > 50) CHAT.msgs.shift();
+    if (!CHAT.aberto && m.msg.de !== EU) { CHAT.naoLidas++; if (chatDisponivel()) tocar('tique'); }
+  }
+  desenharChat();
+  document.querySelectorAll('.btn-chat').forEach((b) => { b.outerHTML = botaoChat(); });
+  ligarChat();
+}
+function htmlMsgsChat() {
+  if (!CHAT.msgs.length) return '<p class="ajuda" style="text-align:center;margin:auto 0">Ninguém escreveu ainda. Manda a primeira!</p>';
+  const sala = S.online && S.online.sala;
+  return CHAT.msgs.map((m) => {
+    const i = sala ? sala.assentos.findIndex((a) => a.id === m.de) : -1;
+    const hora = new Date(m.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return `<div class="chat-msg ${m.de === EU ? 'minha' : ''}" style="--cor-jog:${i >= 0 ? CORES_JOG[i % CORES_JOG.length] : 'var(--suave)'}"><b>${esc(m.de === EU ? 'Você' : m.nome.replace('Bot ', ''))}</b><span>${esc(m.texto)}</span><small>${hora}</small></div>`;
+  }).join('');
+}
+function abrirChat() {
+  CHAT.aberto = true; CHAT.naoLidas = 0;
+  document.querySelectorAll('.btn-chat .chat-bolinha').forEach((x) => x.remove());
+  document.querySelectorAll('.fundo-chat').forEach((x) => x.remove());
+  const f = document.createElement('div');
+  f.className = 'fundo-modal fundo-chat';
+  const so = assistindo();
+  const silenciado = !!(S.online && S.online.sala && (S.online.sala.silenciados || []).includes(EU));
+  f.innerHTML = `<div class="modal chat-painel" role="dialog" aria-modal="true" aria-label="Chat da sala">
+    <div class="linha"><h2 style="font-size:22px">Chat da sala</h2><button class="btn btn-icone" id="fechar-chat" aria-label="Fechar">✕</button></div>
+    <div class="chat-lista" id="chat-lista">${htmlMsgsChat()}</div>
+    ${so ? '<p class="ajuda" style="margin:0;text-align:center">Quem está assistindo só lê o chat.</p>' : silenciado ? '<p class="ajuda" style="margin:0;text-align:center">Você foi silenciado no chat por quem criou a sala.</p>' : `
+    <div class="chat-rapidas">${RAPIDAS.map((r) => `<button type="button" data-rapida="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+    <form class="chat-envio" id="chat-form"><input id="chat-texto" maxlength="200" autocomplete="off" placeholder="Escreva para a sala…" aria-label="Mensagem"><button class="btn btn-principal" type="submit">Enviar</button></form>`}
+  </div>`;
+  document.body.appendChild(f);
+  const fechar = () => { CHAT.aberto = false; f.remove(); };
+  f.querySelector('#fechar-chat').onclick = fechar;
+  f.addEventListener('pointerdown', (ev) => { if (ev.target === f) fechar(); });
+  const lista = f.querySelector('#chat-lista'); lista.scrollTop = lista.scrollHeight;
+  const form = f.querySelector('#chat-form');
+  if (form) {
+    form.onsubmit = (ev) => { ev.preventDefault(); const i = f.querySelector('#chat-texto'); const t = i.value.trim(); if (!t) return; enviar({ tipo: 'chat', texto: t }); i.value = ''; };
+    f.querySelectorAll('[data-rapida]').forEach((b) => (b.onclick = () => enviar({ tipo: 'chat', texto: b.dataset.rapida })));
+  }
+}
+function desenharChat() {
+  const lista = document.getElementById('chat-lista');
+  if (!lista) return;
+  const noFim = lista.scrollHeight - lista.scrollTop - lista.clientHeight < 40;
+  lista.innerHTML = htmlMsgsChat();
+  if (noFim) lista.scrollTop = lista.scrollHeight;
+}
+// a mão começou: o chat de texto fecha (fica a call de voz)
+function fecharChatNaMao() { if (S.tela === 'mesa') { CHAT.aberto = false; document.querySelectorAll('.fundo-chat').forEach((x) => x.remove()); } }
+
 // ---------- lugares: o dono abre um lugar vago (para um amigo entrar pelo link) ou fecha um ----------
 function htmlBotoesLugar(sala) {
   const naMesa = sala ? sala.assentos.filter((a) => !a.sai).length : (S.e ? S.e.jogadores.length : 0);
@@ -2512,7 +2645,7 @@ function abrirConfigSala() {
       <span class="ajuda" style="margin-top:-8px">${S.e && S.e.fase !== 'jogando' ? 'Valem a partir da próxima mão.' : 'Valem a partir da primeira mão.'}</span>
       <span style="font-weight:700">Modo de jogo</span>
       ${htmlModos(cfg.opcoes.cores, 'cfg-modo')}
-      <div id="cfg-bots">${htmlBotsConfig()}</div>
+      ${sala ? `<span style="font-weight:700">Lugares e ordem da vez</span><div id="cfg-lugares">${htmlLugaresGerencia(sala)}</div>` : `<div id="cfg-bots">${htmlBotsConfig()}</div>`}
       <span style="font-weight:700">Tempo por jogada</span>
       <div class="segmentos">${[[15, '15 s'], [20, '20 s'], [30, '30 s'], [0, 'Livre']].map(([v, r]) => `<button type="button" data-cfg-tempo="${v}" aria-pressed="${cfg.tempo === v}">${r}</button>`).join('')}</div>
       <div style="display:flex;flex-direction:column;gap:4px">
@@ -2528,6 +2661,7 @@ function abrirConfigSala() {
     fundo.querySelectorAll('[data-cfg]').forEach((i) => (i.onchange = () => { cfg.opcoes[i.dataset.cfg] = i.checked; }));
     fundo.querySelectorAll('[data-cfg-modo]').forEach((b) => (b.onclick = () => { cfg.opcoes.cores = Number(b.dataset.cfgModo); const y = fundo.querySelector('.modal').scrollTop; desenhar(); fundo.querySelector('.modal').scrollTop = y; }));
     ligarBotsConfig();
+    ligarLugaresGerencia(fundo);
     fundo.querySelector('#cfg-cancelar').onclick = () => fundo.remove();
     fundo.querySelector('#cfg-salvar').onclick = () => {
       if (S.online) enviar({ tipo: 'config', opcoes: cfg.opcoes, tempo: cfg.tempo });
@@ -2861,7 +2995,7 @@ function conectar(aoAbrir) {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   o.ws = ws;
   ws.onopen = () => {
-    o.tentativas = 0; o.caiu = false; o.ultimaMsg = Date.now();
+    o.tentativas = 0; o.caiu = false; o.ultimaMsg = Date.now(); sinalConexao();
     if (o.codigo) {
       enviar(o.espectador ? { tipo: 'entrar', codigo: o.codigo, assistir: true, apelido: S.apelido || 'Visitante', senha: o.senha } : { tipo: 'entrar', codigo: o.codigo, token: o.token, apelido: S.apelido || 'Jogador', avatar: S.avatar, senha: o.senha });
       if (CALL.ativa) enviar({ tipo: 'call', ativo: true }); // voltou da queda: continua na call
@@ -2869,7 +3003,7 @@ function conectar(aoAbrir) {
     else if (o.primeiro) o.primeiro();
     const fila = o.fila; o.fila = [];
     fila.forEach((m) => ws.send(JSON.stringify(m)));
-    clearInterval(o.ping); o.ping = setInterval(() => enviar({ tipo: 'ping' }), 25000);
+    clearInterval(o.ping); o.ping = setInterval(() => enviar({ tipo: 'ping' }), 10000);
     clearInterval(o.vivo); o.vivo = setInterval(() => { if (o.codigo) fetch('/saude', { cache: 'no-store' }).catch(() => {}); }, 5 * 60 * 1000); // o servidor grátis não dorme com a sala aberta
     if (S.tela === 'mesa' || S.tela === 'espera') render();
   };
@@ -2884,7 +3018,7 @@ function conectar(aoAbrir) {
       if (S.tela === 'espera') { S.tela = S.codigoEntrar ? 'entrar' : 'inicio'; render(); }
       return;
     }
-    o.caiu = true;
+    o.caiu = true; sinalConexao();
     if (!o.codigo) { const el = document.getElementById('erro-criar') || document.getElementById('erro-entrar'); if (el) el.textContent = 'Acordando o servidor… (no plano grátis pode levar até 1 minuto)'; }
     if (S.tela === 'mesa' || S.tela === 'espera') render();
     // tenta voltar para a mesma sala com o mesmo lugar
@@ -2895,11 +3029,18 @@ function conectar(aoAbrir) {
   ws.onerror = () => {};
 }
 // Voltou para o jogo (celular desbloqueado, voltou do WhatsApp…): reconecta na hora se a conexão morreu
+// faixa "Reconectando…" enquanto a conexão volta (o jogo continua de onde estava)
+function sinalConexao() {
+  const o = S.online, quer = !!(o && o.codigo && o.caiu && !o.saindo);
+  let el = document.querySelector('.sinal-conexao');
+  if (quer && !el) { el = document.createElement('div'); el.className = 'sinal-conexao'; el.setAttribute('role', 'status'); el.innerHTML = '<i aria-hidden="true"></i>Reconectando…'; document.body.appendChild(el); }
+  else if (!quer && el) el.remove();
+}
 function conferirConexao() {
   const o = S.online;
   if (!o || o.saindo || document.visibilityState !== 'visible') return;
   const ws = o.ws;
-  const morta = !ws || ws.readyState > 1 || (ws.readyState === 1 && Date.now() - (o.ultimaMsg || 0) > 35000);
+  const morta = !ws || ws.readyState > 1 || (ws.readyState === 1 && Date.now() - (o.ultimaMsg || 0) > 25000);
   if (!morta) return;
   clearTimeout(o.timerVolta); clearInterval(o.ping);
   o.tentativas = 0;
@@ -2907,6 +3048,17 @@ function conferirConexao() {
   conectar();
 }
 document.addEventListener('visibilitychange', conferirConexao);
+// Tela acesa enquanto está na mesa (o celular não apaga a tela no meio da partida)
+let travaTela = null;
+async function manterTelaAcesa() {
+  try {
+    const quer = S.tela === 'mesa' && document.visibilityState === 'visible';
+    if (quer && !travaTela && navigator.wakeLock) { travaTela = await navigator.wakeLock.request('screen'); travaTela.addEventListener('release', () => { travaTela = null; }); }
+    else if (!quer && travaTela) { const t = travaTela; travaTela = null; t.release().catch(() => {}); }
+  } catch { travaTela = null; }
+}
+document.addEventListener('visibilitychange', manterTelaAcesa);
+setInterval(manterTelaAcesa, 4000);
 window.addEventListener('pageshow', conferirConexao);
 window.addEventListener('online', conferirConexao);
 function mostrarErroOnline(msg) {
@@ -3003,17 +3155,23 @@ function receberDoServidor(m) {
     o.sala = m.sala;
     if (o.souDono !== (m.sala.dono === EU)) { o.souDono = m.sala.dono === EU; guardarSala(); }
     atualizarBotsConfig();
+    atualizarLugaresConfig();
     atualizarCall();
     const eu = m.sala.assentos.find((a) => a.id === EU);
     if (o.espectador && m.sala.fase === 'espera') { S.erroInicio = 'A partida que você assistia acabou.'; return sairDaSala(); }
     if (o.espectador) { if (S.tela === 'mesa') render(); else if (S.tela === 'fim') atualizarVotos(); else if (m.sala.fase === 'final' && S.e && S.tela !== 'arte') { S.arteDe = 'final'; S.tela = 'arte'; render(); } return; }
-    if (m.sala.fase === 'espera' || (eu && eu.pendente)) { S.tela = 'espera'; render(); }
+    if (m.sala.fase === 'espera' || (eu && eu.pendente)) {
+      if (S.tela === 'mesa' || S.tela === 'fim') { document.querySelectorAll('.palco, .vitoria-show, .fundo-modal:not(.fundo-config)').forEach((x) => x.remove()); pararTimers(); if (m.sala.retomar) mostrarToast('A mão foi encerrada: ninguém pontuou. O placar continua.', 5000); }
+      S.tela = 'espera'; render();
+    }
     else if (m.sala.fase === 'final') { if (S.e && S.tela !== 'arte') { document.querySelectorAll('.palco, .vitoria-show').forEach((x) => x.remove()); S.arteDe = 'final'; S.tela = 'arte'; render(); } }
     else if (S.tela === 'mesa') render();
     else if (S.tela === 'fim') { if (donoAntes !== m.sala.dono) telaFim(); else atualizarVotos(); }
     return;
   }
   if (m.tipo === 'removido') { S.erroInicio = 'Você saiu da mesa.'; return sairDaSala(); }
+  if (m.tipo === 'expulso') { S.erroInicio = 'Você foi removido da sala por quem criou.'; return sairDaSala(); }
+  if (m.tipo === 'chat') return receberChat(m);
   if (m.tipo === 'rtc') return receberRtc(m);
   if (m.tipo === 'aviso') return mostrarToast(m.mensagem, m.curto ? 4000 : 9000);
   if (m.tipo === 'estado') return receberEstado(m);
@@ -3153,7 +3311,7 @@ function telaEspera() {
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
         <span class="ajuda" style="font-size:13px">Sala ${esc(sala.codigo)} · ${(MODOS.find((m) => m[0] === modoCores()) || MODOS[1])[1]}${sala.temSenha ? ' · com senha' : ''}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
-      <span style="margin-left:auto;display:flex;gap:6px">${botaoSom()}${botaoTelaCheia()}</span>
+      <span style="margin-left:auto;display:flex;gap:6px">${botaoChat()}${botaoSom()}${botaoTelaCheia()}</span>
     </div>
     <section class="bloco">
       <span class="rotulo">Convite</span>
@@ -3163,7 +3321,8 @@ function telaEspera() {
       </div>
       <a class="btn" id="zap" href="https://wa.me/?text=${encodeURIComponent(convite)}" target="_blank" rel="noopener" style="display:grid;place-items:center;text-decoration:none;background:#25D366;border-color:#25D366;color:#06210F;font-weight:800">Mandar no WhatsApp</a>
     </section>
-    <div class="linha"><span class="rotulo">Na mesa</span><span style="font-weight:700">${ocupados} de ${sala.assentos.length}</span></div>
+    ${sala.retomar ? `<p class="aviso-retomar"><b>Partida em andamento</b> · ${sala.retomar.rodada} ${sala.retomar.rodada === 1 ? 'mão jogada' : 'mãos jogadas'} · o placar continua quando começar.</p>` : ''}
+    <div class="linha"><span class="rotulo">Na mesa · ordem da vez</span><span style="font-weight:700">${ocupados} de ${sala.assentos.length}</span></div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${sala.assentos.map((a, i) => {
         if (a.tipo === 'aberto') return `<button class="lugar-espera aberto" ${souDono ? `data-alternar="${i}"` : 'disabled'}><span class="bola-espera">+</span><span>Esperando um amigo…</span><b>${souDono ? 'Pôr bot' : 'ABERTO'}</b></button>`;
@@ -3178,8 +3337,8 @@ function telaEspera() {
     ${S.avisoRecriada ? '<p class="aviso" style="height:auto;white-space:normal;color:var(--destaque)">A sala foi recriada depois que o servidor reiniciou. O placar anterior se perdeu.</p>' : ''}
     <p class="aviso erro" id="erro-espera" role="alert" style="height:auto;white-space:normal"></p>
     ${souDono
-      ? `<button class="btn" id="config-sala" style="margin-top:auto">⚙ Regras da sala</button>
-         <button class="btn btn-principal" id="comecar-online" style="min-height:56px" ${ocupados < 2 ? 'disabled' : ''}>Começar${humanos < 2 ? ' com os bots' : ''}</button>
+      ? `<button class="btn" id="config-sala" style="margin-top:auto">⚙ Regras da sala, lugares e ordem</button>
+         <button class="btn btn-principal" id="comecar-online" style="min-height:56px" ${ocupados < 2 ? 'disabled' : ''}>${sala.retomar ? 'Continuar a partida' : `Começar${humanos < 2 ? ' com os bots' : ''}`}</button>
          <p class="ajuda" style="margin:0;text-align:center">Lugares que ficarem abertos saem da mesa quando você começar.</p>`
       : '<p class="aviso" style="margin-top:auto">Esperando quem criou a sala começar…</p>'}
   </main>`;
@@ -3192,6 +3351,7 @@ function telaEspera() {
   };
   app.querySelectorAll('[data-alternar]').forEach((b) => (b.onclick = () => enviar({ tipo: 'lugar', indice: Number(b.dataset.alternar) })));
   ligarBotoesLugar();
+  ligarChat();
   if (document.getElementById('config-sala')) document.getElementById('config-sala').onclick = abrirConfigSala;
   const cm = document.getElementById('comecar-online');
   if (cm) cm.onclick = () => { cm.disabled = true; enviar({ tipo: 'comecar' }); };
@@ -3208,7 +3368,7 @@ function telaProximaMao(sala, link) {
         <h1 style="font-size:26px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sala.nome)}</h1>
         <span class="ajuda" style="font-size:13px">${sala.config && sala.config.salaAberta ? 'Sala aberta' : 'Sala'} ${esc(sala.codigo)}${o.caiu ? ' · reconectando…' : ''}</span>
       </div>
-      <span style="margin-left:auto;display:flex;gap:6px">${botaoSom()}${botaoTelaCheia()}</span>
+      <span style="margin-left:auto;display:flex;gap:6px">${botaoChat()}${botaoSom()}${botaoTelaCheia()}</span>
     </div>
     <div class="bloco" style="align-items:center;text-align:center;gap:8px">
       <span class="avatar-grande" style="cursor:default;border-style:solid">${S.avatar ? `<img src="${S.avatar}" alt="">` : `<span>${esc((S.apelido || '?')[0].toUpperCase())}</span>`}</span>

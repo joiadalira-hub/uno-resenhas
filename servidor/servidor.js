@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomInt, createHash } from 'node:crypto';
 import { aceitarUpgrade } from './ws.js';
-import { novaPartida, aplicar, visaoDe, resolverSequencia, jogadasPossiveis, removerJogadores, adicionarJogador } from '../motor/regras.js';
+import { novaPartida, aplicar, visaoDe, resolverSequencia, jogadasPossiveis, removerJogadores, adicionarJogador, cancelarRodada, arrumarJogadores } from '../motor/regras.js';
 import { escolherAcao } from '../motor/bot.js';
 
 const PORTA = Number(process.env.PORT) || 3000;
@@ -18,7 +18,7 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist
 let VERSAO = '';
 try { VERSAO = (fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8').match(/const VERSAO = '([0-9a-f]{10})'/) || [])[1] || ''; } catch { /* sem dist */ }
 const NOMES_BOTS = ['Ana', 'Rui', 'Bia', 'Léo', 'Duda', 'Caio', 'Mel', 'Nina', 'Tito'];
-const ESPERA_RECONEXAO = 5000;  // caiu a conexão: em 5 s um bot joga por ele até a mão acabar (se voltar, retoma)
+const ESPERA_RECONEXAO = 15000;  // caiu a conexão: em 5 s um bot joga por ele até a mão acabar (se voltar, retoma)
 const ESPERA_VOTOS = 90000;
 const ESPERA_SALA = 3 * 60 * 1000;      // na sala de espera, quem caiu (ex.: foi mandar o link no WhatsApp) guarda o lugar por 3 min      // quem não votar até lá continua na mesa
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -139,6 +139,10 @@ class Sala {
     this.fase = 'espera';
     this.timers = [];
     this.timers9 = []; this.noveDe = null;
+    this.retomar = false;   // o dono encerrou a mão: a sala volta para a espera e a partida continua (placar mantido)
+    this.banidos = new Set(); // quem o dono expulsou (aparelho e apelido) não volta nesta sala
+    this.silenciados = new Set(); // no chat
+    this.chat = [];          // últimas 50 mensagens do chat de texto
     this.espectadores = []; // quem só assiste a partida (não joga, não vota)
     this.prazoAte = 0;
     this.vazioDesde = 0;
@@ -158,6 +162,7 @@ class Sala {
   resumo() {
     return {
       codigo: this.codigo, nome: this.nome, temSenha: !!this.senha, dono: this.dono, fase: this.fase, config: this.config, votos: this.votos, assistindo: this.espectadores.map((v) => v.nome),
+      retomar: this.retomar && this.e ? { rodada: this.e.rodada } : null, silenciados: [...this.silenciados],
       assentos: this.assentos.map((a) => ({ id: a.id, tipo: a.tipo, nome: a.nome, avatar: a.avatar || null, conectado: a.tipo !== 'humano' || a.conectado, pendente: !!a.pendente, sai: !!(a.saiu || a.sai), naCall: !!(a.naCall && a.conectado) })),
     };
   }
@@ -182,6 +187,21 @@ class Sala {
     const jogadores = this.assentos.filter((a) => a.tipo !== 'aberto').map((a) => ({ id: a.id, nome: a.nome, bot: a.tipo === 'bot' || !a.conectado }));
     if (jogadores.length < 2) throw new Error('A mesa precisa de pelo menos 2 jogadores');
     this.assentos = this.assentos.filter((a) => a.tipo !== 'aberto');
+    if (this.retomar && this.e && this.e.fase === 'fim_rodada') {
+      // volta da sala de espera depois de "Encerrar mão": mesma partida, mesmo placar, mesa como está agora
+      Object.assign(this.e.opcoes, this.config.opcoes);
+      arrumarJogadores(this.e, jogadores);
+      for (const a of this.assentos) a.pendente = false;
+      this.retomar = false;
+      this.fase = 'jogando';
+      this.enviarSala();
+      aplicar(this.e, { tipo: 'proxima_rodada' });
+      const ev = { tipo: 'rodada' };
+      this.agendar(ev); this.enviarEstado(ev);
+      log('partida retomada', this.codigo, jogadores.length, 'jogadores');
+      return;
+    }
+    this.retomar = false;
     this.e = novaPartida({ jogadores, opcoes: { ...this.config.opcoes, salaAberta: this.config.salaAberta, fim: { modo: this.config.fimModo, valor: this.config.fimValor } } });
     this.fase = 'jogando';
     this.enviarSala();
@@ -217,19 +237,20 @@ class Sala {
       if (a && (a.saiu || a.sai)) this.votos[j.id] = false; // saiu no meio da mão, ou bot que cede o lugar
       else if (a && a.tipo === 'bot') this.votos[j.id] = true; // humano com bot no lugar ainda vota (ou sai, se não voltar)
     }
-    clearTimeout(this.timerVotos);
-    this.timerVotos = setTimeout(() => {
-      if (!this.votos) return;
-      for (const j of this.e.jogadores) if (!(j.id in this.votos)) {
-        const a = this.assento(j.id);
-        this.votos[j.id] = !(a && a.tipo === 'humano' && !a.conectado); // quem caiu e não voltou até o fim da votação sai da mesa
-      }
-      this.conferirVotos();
-    }, ESPERA_VOTOS);
+    clearTimeout(this.timerVotos); // a próxima mão não começa sozinha: só quando todos votarem ou o dono começar
     this.enviarSala();
     this.conferirVotos();
   }
   assento(id) { return this.assentos.find((a) => a.id === id); }
+  // o dono começa a próxima mão sem esperar todo mundo: quem não votou e está conectado fica; quem caiu sai
+  forcarProxima() {
+    if (!this.votos) return;
+    for (const j of this.e.jogadores) if (!(j.id in this.votos)) {
+      const a = this.assento(j.id);
+      this.votos[j.id] = !(a && a.tipo === 'humano' && !a.conectado);
+    }
+    this.conferirVotos();
+  }
   passarDono() {
     const dono = this.assento(this.dono);
     if (dono && !dono.saiu && dono.tipo === 'humano') return;
@@ -404,6 +425,9 @@ class Sala {
 
   proximaRodada() {
     if (this.e.fase === 'fim_rodada') {
+      // a ordem da vez segue a ordem dos lugares (o dono pode mudar entre as mãos)
+      const pos = new Map(this.assentos.map((a, i) => [a.id, i]));
+      this.e.jogadores.sort((a, b) => (pos.has(a.id) ? pos.get(a.id) : 99) - (pos.has(b.id) ? pos.get(b.id) : 99));
       aplicar(this.e, { tipo: 'proxima_rodada' });
     } else if (this.e.fase === 'fim_partida') {
       const jogadores = this.e.jogadores.map((j) => ({ id: j.id, nome: j.nome, bot: j.bot }));
@@ -419,6 +443,16 @@ class Sala {
     assento.conectado = false;
     assento.conexao = null;
     assento.naCall = false;
+    // o dono caiu e não voltou em 2 min: outra pessoa conectada vira dona (a sala não fica travada)
+    if (assento.id === this.dono) {
+      clearTimeout(this.timerDono);
+      this.timerDono = setTimeout(() => {
+        const d = this.assento(this.dono);
+        if (!d || d.id !== assento.id || d.conectado) return;
+        const outro = this.humanos().find((h) => h.conectado && !h.saiu && h.id !== d.id);
+        if (outro) { this.dono = outro.id; log('novo dono (o anterior caiu)', this.codigo, outro.nome); this.enviarSala(); }
+      }, 2 * 60 * 1000);
+    }
     if (this.fase === 'espera') {
       // celular que troca de app derruba a conexão: o lugar (e o posto de dono) fica guardado
       this.enviarSala();
@@ -479,6 +513,7 @@ function tratar(conexao, msg, ctx) {
     salas.set(sala.codigo, sala);
     ctx.sala = sala; ctx.assento = sala.assentos[0];
     conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: ctx.assento.token, meuId: ctx.assento.id, versao: VERSAO });
+    conexao.enviar({ tipo: 'chat', todas: sala.chat });
     sala.enviarSala();
     log('sala criada', sala.codigo, `(${sala.assentos.length} lugares)`);
     return;
@@ -496,11 +531,14 @@ function tratar(conexao, msg, ctx) {
       sala.espectadores.push(v);
       ctx.sala = sala; ctx.assento = v;
       conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: null, meuId: v.id, espectador: true, versao: VERSAO });
+      conexao.enviar({ tipo: 'chat', todas: sala.chat });
       sala.enviarSala();
       if (sala.e) conexao.enviar({ tipo: 'estado', meuId: v.id, visao: visaoDe(sala.e, v.id), evento: null, prazo: 0 });
       log('assistindo', sala.codigo, v.nome);
       return;
     }
+    const apB = limpaTexto(msg.aparelho, 40), nomeB = (limpaTexto(msg.apelido, 14) || '').toLowerCase();
+    if ((apB && sala.banidos.has('a:' + apB)) || (nomeB && sala.banidos.has('n:' + nomeB))) return erro(conexao, 'Você foi removido desta sala por quem criou.');
     let antigo = msg.token && sala.humanos().find((h) => h.token === msg.token);
     if (!antigo) {
       // quem saiu e voltou não pode aparecer duas vezes: reocupa o lugar dele
@@ -537,6 +575,7 @@ function tratar(conexao, msg, ctx) {
       }
     }
     conexao.enviar({ tipo: 'entrou', codigo: sala.codigo, token: ctx.assento.token, meuId: ctx.assento.id, versao: VERSAO });
+    conexao.enviar({ tipo: 'chat', todas: sala.chat });
     sala.enviarSala();
     if (sala.e && !ctx.assento.pendente) conexao.enviar({ tipo: 'estado', meuId: ctx.assento.id, visao: visaoDe(sala.e, ctx.assento.id), evento: null, prazo: sala.prazoAte ? Math.max(0, sala.prazoAte - Date.now()) : 0 });
     return;
@@ -566,6 +605,92 @@ function tratar(conexao, msg, ctx) {
       }
     } else return erro(conexao, 'Espere a mão acabar para mexer nos lugares.');
     sala.capacidade = Math.max(sala.capacidade, ativosMesa().length);
+    return sala.enviarSala();
+  }
+  const podeMexer = () => sala.fase === 'espera' || entreMaosAgora();
+  // Ordem dos jogadores (= ordem da vez): o dono sobe/desce um lugar ou embaralha
+  if (tipo === 'mover' || tipo === 'embaralhar' || tipo === 'tirarLugar') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala mexe nos lugares.');
+    if (!podeMexer()) return erro(conexao, 'Durante a mão a mesa fica como está: mude entre as mãos.');
+    if (tipo === 'mover') {
+      const i = Number(msg.indice), j = i + (msg.dir < 0 ? -1 : 1);
+      if (!sala.assentos[i] || !sala.assentos[j]) return;
+      [sala.assentos[i], sala.assentos[j]] = [sala.assentos[j], sala.assentos[i]];
+    } else if (tipo === 'embaralhar') {
+      for (let i = sala.assentos.length - 1; i > 0; i--) { const k = randomInt(i + 1); [sala.assentos[i], sala.assentos[k]] = [sala.assentos[k], sala.assentos[i]]; }
+    } else {
+      const a = sala.assentos[Number(msg.indice)];
+      if (!a || a.tipo !== 'aberto') return;
+      sala.assentos.splice(Number(msg.indice), 1);
+    }
+    return sala.enviarSala();
+  }
+  // O dono tira alguém da sala (não volta nesta sala)
+  if (tipo === 'expulsar') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala pode tirar alguém.');
+    const alvo = sala.humanos().find((h) => h.id === msg.id);
+    if (!alvo || alvo.id === assento.id) return;
+    if (alvo.aparelho) sala.banidos.add('a:' + alvo.aparelho);
+    sala.banidos.add('n:' + alvo.nome.toLowerCase());
+    const c = alvo.conexao;
+    alvo.conexao = null; alvo.conectado = false; alvo.token = null;
+    const i = sala.assentos.indexOf(alvo);
+    const naMesa = sala.fase === 'jogando' && sala.e && sala.e.jogadores.find((x) => x.id === alvo.id);
+    if (!naMesa || alvo.pendente) { if (i >= 0) sala.assentos[i] = { tipo: 'aberto', id: `a${sala.seq++}` }; }
+    else { alvo.saiu = true; naMesa.bot = true; if (sala.votos) sala.votos[alvo.id] = false; if (sala.e.fase === 'jogando') { sala.agendar({ tipo: 'nada' }); sala.enviarEstado(null); } }
+    if (c) { c.enviar({ tipo: 'expulso' }); setTimeout(() => c.fechar(), 300); }
+    log('expulso', sala.codigo, alvo.nome);
+    sala.enviarSala();
+    if (sala.votos) sala.conferirVotos();
+    return;
+  }
+  // O dono encerra a mão: ninguém pontua, todos voltam para a sala de espera e a partida continua de lá
+  if (tipo === 'encerrar') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala pode encerrar a mão.');
+    if (sala.fase !== 'jogando' || !sala.e || sala.e.fase === 'fim_partida') return;
+    sala.limparTimers(); sala.limparNove(); clearTimeout(sala.timerVotos); sala.votos = null;
+    cancelarRodada(sala.e);
+    sala.assentos = sala.assentos.filter((a) => !a.saiu && !(a.tipo === 'bot' && a.sai));
+    for (const a of sala.assentos) { a.pendente = false; a.sai = false; }
+    sala.fase = 'espera'; sala.retomar = true;
+    const r = sala.resumo();
+    for (const v of sala.espectadores) try { v.conexao.enviar({ tipo: 'sala', sala: r }); } catch { /* já fechada */ }
+    sala.espectadores = [];
+    log('mão encerrada pelo dono', sala.codigo);
+    return sala.enviarSala();
+  }
+  // O dono começa a próxima mão sem esperar todos votarem
+  if (tipo === 'proxima') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala pode começar a próxima mão.');
+    return sala.forcarProxima();
+  }
+  // Chat de texto: só na sala de espera e entre as mãos (durante a mão, só a call de voz)
+  if (tipo === 'chat') {
+    if (sala.fase === 'jogando' && sala.e && sala.e.fase === 'jogando') return erro(conexao, 'O chat de texto volta quando a mão acabar.');
+    if (sala.silenciados.has(assento.id)) return erro(conexao, 'Você foi silenciado no chat por quem criou a sala.');
+    const agora = Date.now();
+    if (agora - (assento.ultimoChat || 0) < 1000) return;
+    const texto = limpaTexto(msg.texto, 200);
+    if (!texto) return;
+    assento.ultimoChat = agora;
+    const m = { id: `m${sala.seq++}`, de: assento.id, nome: assento.nome, texto, t: agora };
+    sala.chat.push(m); if (sala.chat.length > 50) sala.chat.shift();
+    for (const h of sala.humanos()) if (h.conexao) h.conexao.enviar({ tipo: 'chat', msg: m });
+    for (const v of sala.espectadores) v.conexao.enviar({ tipo: 'chat', msg: m });
+    return;
+  }
+  if (tipo === 'silenciar') {
+    if (assento.id !== sala.dono || msg.id === assento.id) return;
+    if (sala.silenciados.has(msg.id)) sala.silenciados.delete(msg.id); else sala.silenciados.add(msg.id);
+    return sala.enviarSala();
+  }
+  // O dono passa o posto para outra pessoa conectada
+  if (tipo === 'dono') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem é dono da sala pode passar o posto.');
+    const novo = sala.humanos().find((h) => h.id === msg.id && h.conectado && !h.saiu);
+    if (!novo) return erro(conexao, 'Essa pessoa não está conectada.');
+    sala.dono = novo.id; clearTimeout(sala.timerDono);
+    log('novo dono (passado)', sala.codigo, novo.nome);
     return sala.enviarSala();
   }
   // O dono abre (ou fecha) um lugar vago para um amigo entrar pelo link
@@ -695,23 +820,40 @@ servidor.on('upgrade', (req, socket) => {
   const conexao = aceitarUpgrade(req, socket);
   if (!conexao) return;
   const ctx = { sala: null, assento: null };
-  conexao.on('mensagem', (msg) => { try { tratar(conexao, msg, ctx); } catch (err) { log('erro', err.message); erro(conexao, 'Algo deu errado no servidor.'); } });
+  conexao.ultimo = Date.now();
+  conexoes.add(conexao);
+  conexao.on('mensagem', (msg) => { conexao.ultimo = Date.now(); try { tratar(conexao, msg, ctx); } catch (err) { log('erro', err.message); erro(conexao, 'Algo deu errado no servidor.'); } });
   conexao.on('close', () => {
+    conexoes.delete(conexao);
     if (ctx.sala && ctx.assento && ctx.assento.espectador) { const sala = ctx.sala; sala.espectadores = sala.espectadores.filter((v) => v !== ctx.assento); sala.enviarSala(); return; }
     if (ctx.sala && ctx.assento && ctx.assento.conexao === conexao) ctx.sala.caiu(ctx.assento);
   });
 });
 
-// Salas sem ninguém conectado por 30 minutos são apagadas
+// Celular que sumiu sem avisar (app fechado, sem sinal): sem nenhuma mensagem em 30 s, a conexão é dada como caída
+// (o jogo manda um "ping" a cada 10 s; antes uma conexão fantasma deixava a pessoa "conectada" por muito tempo)
+const conexoes = new Set();
+setInterval(() => {
+  const agora = Date.now();
+  for (const c of conexoes) if (agora - c.ultimo > 30000) { conexoes.delete(c); c.fechar(); }
+}, 5000).unref();
+
+// Salas sem nenhuma pessoa conectada são apagadas: partida terminada em 2 min, partida só com bots em 3 min,
+// sala de espera em 5 min (tempo de mandar o link no WhatsApp e voltar)
+const VIDA_SEM_NINGUEM = { final: 2 * 60 * 1000, jogando: 3 * 60 * 1000, espera: 5 * 60 * 1000 };
 setInterval(() => {
   const agora = Date.now();
   for (const [codigo, sala] of salas) {
     const alguem = sala.humanos().some((h) => h.conectado);
     if (alguem) { sala.vazioDesde = 0; continue; }
     if (!sala.vazioDesde) sala.vazioDesde = agora;
-    else if (agora - sala.vazioDesde > 30 * 60 * 1000) { sala.limparTimers(); sala.limparNove(); salas.delete(codigo); log('sala apagada', codigo); }
+    else if (agora - sala.vazioDesde > (VIDA_SEM_NINGUEM[sala.fase] || VIDA_SEM_NINGUEM.espera)) {
+      sala.limparTimers(); sala.limparNove(); clearTimeout(sala.timerVotos); clearTimeout(sala.timerDono);
+      for (const v of sala.espectadores) try { v.conexao.fechar(); } catch { /* já fechada */ }
+      salas.delete(codigo); log('sala apagada', codigo, sala.fase);
+    }
   }
-}, 60 * 1000).unref();
+}, 20 * 1000).unref();
 
 servidor.listen(PORTA, () => log(`Uno Resenhas no ar na porta ${PORTA}`));
 

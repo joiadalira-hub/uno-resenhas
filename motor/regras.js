@@ -93,7 +93,7 @@ export function iniciarRodada(e) {
   e.topo = { tipo: primeira.tipo, cor: primeira.cor, valor: primeira.valor };
   e.corAtual = primeira.cor;
 
-  e.quemComecouUltima = e.quemComecouUltima < 0 ? Math.floor(e.rng() * e.jogadores.length) : (e.quemComecouUltima + 1) % e.jogadores.length;
+  e.quemComecouUltima = Math.floor(e.rng() * e.jogadores.length); // quem começa é sempre sorteado
   e.vez = e.quemComecouUltima;
   e.fase = 'jogando';
 
@@ -536,6 +536,29 @@ export function removerJogadores(e, ids) {
   e.jogadores = ficam;
   e.quemComecouUltima = e.quemComecouUltima % ficam.length;
   e.vez = Math.min(e.vez, ficam.length - 1);
+  return e;
+}
+
+// O dono encerrou a mão no meio: ela não conta (nem pontos nem número da rodada)
+export function cancelarRodada(e) {
+  if (e.fase !== 'jogando') return e;
+  e.rodada -= 1;
+  for (const j of e.jogadores) j.mao = [];
+  e.fase = 'fim_rodada';
+  e.resultadoRodada = null; e.regra9 = null; e.compraPendente = null; e.vulneravel = null; e.comprou = null;
+  return e;
+}
+// Entre as mãos: a mesa fica com estes jogadores, nesta ordem (quem já estava mantém pontos e vitórias)
+export function arrumarJogadores(e, lista) {
+  if (e.fase === 'jogando') throw new ErroJogada('fase', 'Só dá para mexer na mesa entre as mãos');
+  if (lista.length < 2 || lista.length > 10) throw new ErroJogada('jogadores', 'A mesa precisa de 2 a 10 jogadores');
+  const antes = new Map(e.jogadores.map((j) => [j.id, j]));
+  e.jogadores = lista.map((n) => {
+    const j = antes.get(n.id);
+    if (j) { j.bot = !!n.bot; j.nome = n.nome || j.nome; return j; }
+    return { id: n.id, nome: n.nome, bot: !!n.bot, mao: [], pontos: 0, vitorias: 0, maos: 0 };
+  });
+  e.vez = 0;
   return e;
 }
 

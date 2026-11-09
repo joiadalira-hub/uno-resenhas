@@ -501,7 +501,9 @@ const assistindo = () => !!(S.online && S.online.espectador);
 const minhaVez = () => S.e.fase === 'jogando' && S.e.jogadores[S.e.vez].id === EU;
 // Na minha vez sem nada para jogar (o jogo compra sozinho). Com carta que serve, comprar continua sendo escolha minha.
 const semJogada = (e) => !e.regra9 && !e.comprou && !(e.compraPendente && e.ultimoMais5) && jogadasPossiveis(e, EU).length === 0;
-const avisoSemJogada = (e) => (e.compraPendente ? `Sem resposta para o ${e.compraPendente.tipo === '+5' ? nomeMaisN() : e.compraPendente.tipo}: comprando ${e.compraPendente.quantidade}…` : 'Nenhuma carta serve: comprando uma…');
+const avisoSemJogada = (e) => (minhaMao().some((c) => /vencer/i.test(validarJogada(e, EU, [c.id]).mensagem || ''))
+  ? `Sua última carta é especial e nesta sala não dá para bater com ela (regra "Vencer com carta especial" desligada): ${e.compraPendente ? `comprando ${e.compraPendente.quantidade}…` : 'comprando uma…'}`
+  : e.compraPendente ? `Sem resposta para o ${e.compraPendente.tipo === '+5' ? nomeMaisN() : e.compraPendente.tipo}: comprando ${e.compraPendente.quantidade}…` : 'Nenhuma carta serve: comprando uma…');
 
 // ---------- salas para entrar (tela inicial) ----------
 S.salas = null;
@@ -1007,6 +1009,8 @@ function telaMesa() {
     if (!podeUltimaCombo) ui.comboUltima = false;
   }
   const comboDisponivel = vez && possiveis.some((p) => p.ids.length > 1);
+  // recebeu +4/+5/+6 e não tem como responder: só sobra comprar ou desafiar — a mão some e as duas opções ficam grandes na frente
+  const decisao = vez && !!v.podeDesafiar && possiveis.length === 0 && !ui.combo;
   // montando combo: na mão só aparecem as cartas escolhidas e as que podem entrar agora (as outras somem)
   const maoVista = ui.combo && vez ? mao.filter((c) => ui.seq.includes(c.id) || candidatosCombo.has(c.id)) : mao;
   // Tamanho das cartas acompanha a tela (celular ou PC)
@@ -1043,7 +1047,7 @@ function telaMesa() {
   // a mão não volta para o começo a cada toque (montando combo, comprando, etc.)
   const rolagemMao = (() => { const w = document.querySelector('.mao-wrap'); return w ? w.scrollLeft : null; })();
   app.innerHTML = `
-  <main class="mesa ${ui.distribuindo ? 'distribuindo' : ''}" style="--cw:${cw}px;--cw-topo:${cwTopo}px;--cor-atual:${VAR_COR[v.corAtual]}">
+  <main class="mesa ${ui.distribuindo ? 'distribuindo' : ''} ${decisao ? 'decidindo' : ''}" style="--cw:${cw}px;--cw-topo:${cwTopo}px;--cor-atual:${VAR_COR[v.corAtual]}">
     <div class="topo-mesa">
       <button class="btn btn-icone" id="sair" aria-label="Sair da partida"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       <span style="font-size:14px;font-weight:700;color:var(--suave)">${rotRodada}</span>
@@ -1096,7 +1100,12 @@ function telaMesa() {
         <div class="linha"><span style="font:800 16px var(--display);color:var(--destaque)">Montando combo</span>${seqValida && !seqValida.ok ? `<span class="ajuda" style="color:#FF8A82">${esc(seqValida.mensagem)}</span>` : ''}</div>
         <div class="fichas">${fichas}</div>
         ${podeUltimaCombo ? `<button type="button" class="chip-ultima" id="combo-ultima" aria-pressed="${!!ui.comboUltima}"><span class="caixa" aria-hidden="true">${ui.comboUltima ? '✓' : ''}</span>Dizer <b>Última!</b> junto com o combo</button>` : ''}</div>` : ''}
-      <div class="mao-wrap"><div class="mao" style="--sobrepor:${sobrepor}px">
+      ${decisao ? `<div class="decisao-mais" role="group" aria-label="Escolha: comprar ou desafiar">
+        <p class="decisao-titulo">Você recebeu <b>${esc(nomeMaisN())}</b> e não tem carta para responder.</p>
+        <button class="btn decisao-op comprar" id="comprar"><b>Comprar ${v.compraPendente.quantidade}</b><small>Aceita e compra as cartas</small></button>
+        <button class="btn decisao-op desafiar" id="desafiar"><b>Desafiar</b><small>Se quem jogou tinha carta da cor, ele compra ${v.compraPendente.quantidade}. Se não tinha, você compra ${v.compraPendente.quantidade + 2}.</small></button>
+        <span class="ajuda decisao-mao">Você tem ${mao.length} ${mao.length === 1 ? 'carta' : 'cartas'} na mão.</span>
+      </div>` : `<div class="mao-wrap"><div class="mao" style="--sobrepor:${sobrepor}px">
       ${maoVista.map((c) => {
         const i = ui.seq.indexOf(c.id);
         const escolhida = ui.combo && i >= 0;
@@ -1105,7 +1114,7 @@ function telaMesa() {
         return `<button class="carta ${escolhida ? 'escolhida' : ''} ${jogavel ? 'jogavel' : ''} ${apagada ? 'apagada' : ''} ${ui.treme === c.id ? 'treme' : ''}" data-carta="${c.id}" aria-label="${esc(nomeCarta(c))}${escolhida ? ', posição ' + (i + 1) : ''}">
           <img src="${imgCarta(c)}" alt="">${escolhida ? `<span class="ordem">${i + 1}</span>` : ''}</button>`;
       }).join('')}
-      </div></div>
+      </div></div>`}
     </div>
     <p class="aviso ${ui.erro ? 'erro' : ''}" role="status">${esc(ui.aviso)}</p>
     <div class="base-mesa">
@@ -1117,6 +1126,7 @@ function telaMesa() {
       <div class="acoes">
       ${ui.combo ? `<button class="btn" id="cancelar">Cancelar</button>
         <button class="btn btn-principal duplo" id="jogar-combo" ${seqValida && seqValida.ok ? '' : 'disabled'}>Jogar ${ui.seq.length || ''} ${ui.seq.length === 1 ? 'carta' : 'cartas'}${podeUltimaCombo && ui.comboUltima ? ' + Última!' : ''}</button>`
+      : decisao ? '<span class="ajuda" style="align-self:center;text-align:center;grid-column:1/-1">Escolha acima: comprar ou desafiar</span>'
       : `${e.comprou && vez ? '<button class="btn" id="passar">Passar</button>' : `<button class="btn" id="comprar" ${vez ? '' : 'disabled'}>${v.compraPendente && vez ? `Comprar ${v.compraPendente.quantidade}` : 'Comprar'}</button>`}
         ${v.podeDesafiar ? `<button class="btn btn-perigo" id="desafiar">Desafiar ${nomeMaisN()}</button>` : `<button class="btn ${comboDisponivel ? 'btn-principal' : ''}" id="combo" ${comboDisponivel ? '' : 'disabled'}>Combo</button>`}
         <button class="btn ${jogando && mao.length <= 2 && !e.disseUltima[EU] && (vez || e.vulneravel === EU) ? 'btn-alerta' : ''}" id="ultima" ${jogando && minhaMao().length <= 2 && minhaMao().length > 0 && !e.disseUltima[EU] ? '' : 'disabled'}>${e.disseUltima[EU] && mao.length <= 2 ? 'Avisado!' : 'Última!'}</button>`}

@@ -1274,6 +1274,7 @@ function descrever(acao, r) {
   if (acao.tipo === 'jogar' || acao.tipo === 'corte') {
     const cartas = e.descarte.slice(-acao.cartas.length).map(nomeCarta).join(' + ');
     let t = `${quem}${acao.tipo === 'corte' ? ' cortou com' : ' jogou'} ${cartas}`;
+    if (r && r.compraDefesa) t += ` · não bate com especial: ${quem === 'Você' ? 'comprou' : 'comprou'} 1`;
     if (e.compraPendente) t += ` · ${nomeJog(e.jogadores[e.vez].id).replace('Bot ', '')} compra ${e.compraPendente.quantidade} ou responde`;
     for (const ev of r.eventos || []) {
       if (ev.tipo === 'troca') t += ` · trocou de mão com ${nomeJog(ev.com).replace('Bot ', '')}`;

@@ -196,12 +196,15 @@ function checarJogada(e, idJogador, idsCartas, { foraDaVez }) {
   }
 
   // Só se vence com números
-  const vence = cartas.length === j.mao.length;
+  let vence = cartas.length === j.mao.length;
+  let defesaFinal = false;
   if (vence && foraDaVez && e.opcoes.baterNoCorte === false) throw new ErroJogada('bater_corte', 'Nesta sala não dá para bater no corte');
   if (vence && !e.opcoes.vencerComEspecial && cartas.some((c) => c.tipo !== 'num')) {
-    throw new ErroJogada('vitoria_especial', 'Só dá para vencer com cartas de número');
+    // defesa com a última carta (+2 / +N / Ctrl+C contra uma compra): pode se defender, mas não bate — compra 1 na hora
+    if (e.compraPendente && !foraDaVez && cartas.every((c) => ehCompra(c.tipo) || c.tipo === 'ctrl')) { vence = false; defesaFinal = true; }
+    else throw new ErroJogada('vitoria_especial', 'Só dá para vencer com cartas de número');
   }
-  return { cartas, efetivas, vence, indice: ij };
+  return { cartas, efetivas, vence, indice: ij, defesaFinal };
 }
 
 // Todas as jogadas possíveis (usado para acender o botão Combo e pelos bots)
@@ -256,7 +259,7 @@ export function aplicar(e, acao) {
 }
 
 function jogar(e, acao, foraDaVez) {
-  const { cartas, efetivas, vence, indice } = checarJogada(e, acao.jogador, acao.cartas, { foraDaVez });
+  const { cartas, efetivas, vence, indice, defesaFinal } = checarJogada(e, acao.jogador, acao.cartas, { foraDaVez });
   const j = e.jogadores[indice];
   const ultimaEf = efetivas[efetivas.length - 1];
   const n = cartas.length;
@@ -300,6 +303,13 @@ function jogar(e, acao, foraDaVez) {
   } else e.disseUltima[j.id] = false;
 
   if (vence) return encerrarRodada(e, j.id);
+  // defendeu com a última carta especial: não pode bater, então compra 1 na hora (e fica avisado da Última)
+  let compraDefesa = null;
+  if (defesaFinal) {
+    compraDefesa = darCartas(e, j, 1);
+    e.disseUltima[j.id] = true;
+    if (e.vulneravel === j.id) e.vulneravel = null;
+  }
 
   // efeitos somados (carta de ação usada no corte não tem efeito: só corta a vez)
   let pular = 0;
@@ -345,7 +355,8 @@ function jogar(e, acao, foraDaVez) {
     const noves = efetivas.filter((x) => x.tipo === 'num' && x.valor === 9).length;
     if (noves) { e.regra9 = { quantidade: noves, por: j.id, apertaram: [] }; eventos.push({ tipo: 'regra9', quantidade: noves }); }
   }
-  return { eventos };
+  if (compraDefesa) eventos.push({ tipo: 'defesaFinal', jogador: j.id, quantidade: compraDefesa.length });
+  return { eventos, compraDefesa: compraDefesa ? compraDefesa.length : 0 };
 }
 
 function tirarDoMonte(e) {

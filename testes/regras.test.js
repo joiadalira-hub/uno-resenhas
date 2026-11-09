@@ -378,3 +378,18 @@ test('corte com coringa e ação (opcional): só corta a vez, a ação não vale
   e5.topo = { tipo: 'coringa', cor: 'azul' }; e5.corAtual = 'azul';
   assert.throws(() => aplicar(e5, { tipo: 'corte', jogador: 'j2', cartas: [e5.jogadores[1].mao[0].id] }));
 });
+
+test('defesa com a última carta especial: joga o +2/+N, não bate e compra 1 na hora', () => {
+  const m2 = C('+2', 'verde'), topo = C('+2', 'azul');
+  const e = mesa({ maos: [[m2], extras(), extras()], topo, vez: 0 });
+  e.compraPendente = { tipo: '+2', quantidade: 2 };
+  aplicar(e, { tipo: 'jogar', jogador: 'j1', cartas: [m2.id] });
+  assert.equal(e.fase, 'jogando');
+  assert.equal(e.jogadores[0].mao.length, 1);
+  assert.equal(e.compraPendente.quantidade, 4);
+  assert.equal(e.disseUltima.j1, true);
+  // sem compra para responder, continua proibido bater com especial
+  const p2 = C('+2', 'azul');
+  const e2 = mesa({ maos: [[p2], extras(), extras()], topo: N('azul', 3), vez: 0 });
+  assert.throws(() => aplicar(e2, { tipo: 'jogar', jogador: 'j1', cartas: [p2.id] }));
+});

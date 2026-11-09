@@ -1017,6 +1017,12 @@ body.paisagem .supreme-tag, .baixo .supreme-tag { font-size: clamp(20px, calc(va
 .decisao-mao { text-align: center; }
 .mesa.decidindo .base-mesa { display: none; }
 .mesa.decidindo .aviso { display: none; }
+/* chat: a fileira de reações rola por dentro e não alarga a janela */
+.fundo-chat { grid-template-columns: minmax(0, 460px); justify-content: center; }
+.chat-painel { min-width: 0; box-sizing: border-box; overflow: hidden; }
+.chat-painel > * { min-width: 0; max-width: 100%; }
+.chat-rapidas { min-width: 0; max-width: 100%; }
+.chat-envio .btn { flex: none; }
 </style>
 
 <div id="app"></div>

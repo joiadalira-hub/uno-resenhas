@@ -1,3 +1,5 @@
+// iPhone/iPad: o Safari tem pouca memória de vídeo; com o fundo animado pesado, as cartas às vezes somem e voltam (piscam)
+if (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) document.documentElement.classList.add('ios');
 // ===== O jogo nunca deita: com o celular de lado, a tela é girada de volta e continua em pé =====
 // (o navegador não deixa um site ignorar o giro do celular; então a página toda é desenhada girada, e as
 //  medidas de tela/posição que o jogo usa são convertidas para o "em pé")

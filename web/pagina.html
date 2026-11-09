@@ -1037,6 +1037,15 @@ body[data-tela="mesa"] #app { overflow: hidden; height: 100%; }
 body[data-tela="mesa"] .mesa { overflow: hidden; }
 /* montando combo: o painel fica um pouco mais alto, sobre a mesa */
 .mesa.montando .painel-combo { bottom: calc(100% + var(--cw, 76px) * 0.55); }
+/* iPhone: fundo mais leve (sem mistura de cores nem desfoque animado) e cartas em camada estável — evita cartas piscando */
+html.ios .fx-fundo .orbe { mix-blend-mode: normal; will-change: auto; opacity: .32; }
+html.ios .neon .n-halo { filter: none; opacity: .18; animation: none; }
+html.ios .neon .n-luz { filter: none; }
+html.ios body[data-tela="mesa"] .fx-fundo *, html.ios body[data-tela="mesa"] .fx-fundo { animation-play-state: paused !important; }
+html.ios body[data-tela="mesa"] .fx-fundo .varredura { display: none; }
+html.ios .carta img, html.ios .topo-pilha img:not(.final-vira):not(.some-depois):not(.pinta), html.ios .combo-carta img, html.ios .mao-fora-cartas img {
+  -webkit-backface-visibility: hidden; backface-visibility: hidden; -webkit-transform: translateZ(0); transform: translateZ(0); }
+html.ios .assento img, html.ios .monte img, html.ios .topo-pilha img { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
 </style>
 
 <div id="app"></div>

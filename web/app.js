@@ -1315,9 +1315,18 @@ function agir(acao) {
   if (acao.tipo === 'apertar9' && acao.jogador === EU && !noveAberto()) return; // antes da janela abrir: não conta
   if (acao.jogador === EU && ESPERA_ANIM.has(acao.tipo) && emAnimacao()) {
     // chegou cedo (relógio, compra automática): faz assim que a animação acabar
-    const e0 = S.e;
-    setTimeout(() => { if (S.e === e0 && S.ui === ui && minhaVez()) agir(acao); }, ui.comboAte - Date.now() + 40);
-    return;
+    // (antes, no online, qualquer atualização do servidor no meio cancelava a jogada guardada: o toque "sumia")
+    ui.aviso = 'Sua jogada sai assim que a animação terminar…'; ui.erro = false;
+    const tenta = () => {
+      if (S.ui !== ui || !S.e || !minhaVez()) return;
+      if (emAnimacao()) return setTimeout(tenta, Math.max(40, ui.comboAte - Date.now() + 40));
+      const minhas = new Set(minhaMao().map((c) => c.id));
+      if (acao.cartas && !acao.cartas.every((id) => minhas.has(id))) return;
+      if (acao.cartas && acao.tipo === 'jogar' && !validarJogada(S.e, EU, acao.cartas).ok) return;
+      agir(acao);
+    };
+    setTimeout(tenta, Math.max(40, ui.comboAte - Date.now() + 40));
+    return render();
   }
   if (acao.jogador === EU && acao.tipo === 'jogar' && minhaMao().length - acao.cartas.length === 1 && S.e.disseUltima[EU]) acao.ultima = true;
   // Online: só pede ao servidor; a jogada volta em receberEstado com as animações

@@ -2458,7 +2458,7 @@ function telaFim() {
   const aberta = !!e.opcoes.salaAberta;
   const dono = souDonoDaSala();
   const linhas = r.colocacao.map((c, i) => `<div class="lin ${S.repetindoTela ? '' : 'entra'} ${c.jogador === EU ? 'eu' : ''}" style="--i:${i}"><span class="pos" style="color:${c.posicao === 1 ? 'var(--destaque)' : 'inherit'}">${c.posicao}º</span><span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nomeJog(c.jogador).replace('Bot ', ''))}</span><span class="dir" style="color:var(--suave)">${c.pontosNaMao} pts</span><span class="ganho">+${c.ganhou}</span></div>`).join('');
-  const geral = placarGeral.map((p, i) => `<div class="lin ${S.repetindoTela ? '' : 'entra'} ${aberta ? 'cinco' : ''} ${p.jogador === EU ? 'eu' : ''}" style="--i:${i + r.colocacao.length}"><span class="pos">${i + 1}º</span><span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.jogador === EU ? (S.apelido || 'Você') : p.nome.replace('Bot ', ''))}</span><span class="dir" style="font-weight:800;color:${porVit ? 'var(--destaque)' : 'var(--suave)'}">${aberta ? p.vitorias : `${p.vitorias} ${p.vitorias === 1 ? 'vit.' : 'vits.'}`}</span>${aberta ? `<span class="dir" style="font-weight:800;color:var(--suave)">${p.maos}</span>` : ''}<span class="ganho" style="color:var(--texto)">${p.pontos}</span></div>`).join('');
+  const geral = placarGeral.map((p, i) => `<div class="lin ${S.repetindoTela ? '' : 'entra'} ${aberta ? 'cinco' : ''} ${p.jogador === EU ? 'eu' : ''} ${p.fora ? 'fora' : ''}" style="--i:${i + r.colocacao.length}"><span class="pos">${i + 1}º</span><span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.jogador === EU ? (S.apelido || 'Você') : p.nome.replace('Bot ', ''))}${p.fora ? ' <small class="tag-fora">saiu</small>' : ''}</span><span class="dir" style="font-weight:800;color:${porVit ? 'var(--destaque)' : 'var(--suave)'}">${aberta ? p.vitorias : `${p.vitorias} ${p.vitorias === 1 ? 'vit.' : 'vits.'}`}</span>${aberta ? `<span class="dir" style="font-weight:800;color:var(--suave)">${p.maos}</span>` : ''}<span class="ganho" style="color:var(--texto)">${p.pontos}</span></div>`).join('');
   const rotulo = acabou ? 'Fim da partida' : aberta ? `Mão ${e.rodada} · sala aberta` : fim.modo === 'rodadas' ? `Rodada ${e.rodada} de ${fim.valor}` : `Rodada ${e.rodada}`;
   if (ui.votoEnviado === undefined && S.online && votosAtuais()[EU] !== undefined) ui.votoEnviado = votosAtuais()[EU];
   const votou = ui.votoEnviado !== undefined;
@@ -2803,7 +2803,9 @@ function textoCabe(c, texto, max) {
 }
 async function desenharArte() {
   const e = S.e;
-  const W = 1080, H = 1350;
+  const nLinhas = placar(e).length;
+  const EXTRA = Math.max(0, Math.round(nLinhas * 60 - 318)); // muita gente no placar: a arte fica mais comprida, nunca some ninguém
+  const W = 1080, H = 1350 + EXTRA;
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const c = cv.getContext('2d');
@@ -2826,7 +2828,7 @@ async function desenharArte() {
   brilho.addColorStop(0, 'rgba(255,212,59,.30)'); brilho.addColorStop(1, 'rgba(255,212,59,0)');
   c.fillStyle = brilho; c.fillRect(0, 0, W, H);
   // cartas espalhadas nos cantos
-  const posEnfeite = [[40, 110, -24], [1040, 120, 22], [-40, 640, -14], [1120, 600, 16], [20, 1330, 18], [1060, 1330, -20]];
+  const posEnfeite = [[40, 110, -24], [1040, 120, 22], [-40, 640, -14], [1120, 600, 16], [20, 1330 + EXTRA, 18], [1060, 1330 + EXTRA, -20]];
   enfeites.forEach((img, i) => {
     if (!img) return;
     const [x, y, giro] = posEnfeite[i];
@@ -2897,7 +2899,7 @@ async function desenharArte() {
   c.font = `800 32px ${CORPO}`; c.fillStyle = '#FFD43B';
   c.fillText(`${camp.vitorias} ${camp.vitorias === 1 ? 'vitória' : 'vitórias'}  ·  ${camp.pontos} pontos`, cx, 838);
   // ranking (sobre um painel escuro, para as cartas do fundo não atrapalharem)
-  const topo = 868, fim = 1226;
+  const topo = 868, fim = 1226 + EXTRA;
   const n = lista.length;
   const alt = Math.min(84, (fim - topo - 40) / n);
   c.fillStyle = 'rgba(8,12,26,.6)'; retanguloRedondo(c, 64, topo - 8, W - 128, 40 + n * alt + 24, 28); c.fill();
@@ -2932,9 +2934,9 @@ async function desenharArte() {
   const rodape = `${e.rodada} ${aberta ? (e.rodada === 1 ? 'mão jogada' : 'mãos jogadas') : e.rodada === 1 ? 'rodada jogada' : 'rodadas jogadas'}  ·  ${totalPontos} pontos na mesa`;
   c.textAlign = 'center'; c.font = `800 30px ${CORPO}`;
   const wr = c.measureText(rodape).width + 60;
-  c.fillStyle = 'rgba(8,12,26,.85)'; retanguloRedondo(c, W / 2 - wr / 2, 1250, wr, 56, 28); c.fill();
+  c.fillStyle = 'rgba(8,12,26,.85)'; retanguloRedondo(c, W / 2 - wr / 2, 1250 + EXTRA, wr, 56, 28); c.fill();
   c.lineWidth = 3; c.strokeStyle = '#33406B'; c.stroke();
-  c.fillStyle = '#FFFFFF'; c.fillText(rodape, W / 2, 1289);
+  c.fillStyle = '#FFFFFF'; c.fillText(rodape, W / 2, 1289 + EXTRA);
   return cv;
 }
 function nomeArquivoArte() {
@@ -3292,7 +3294,7 @@ function espelho(v) {
     topo: v.topo, corAtual: v.corAtual, compraPendente: v.compraPendente, regra9: v.regra9,
     comprou: v.cartaComprada, vulneravel: v.vulneravel, disseUltima: { [EU]: v.disseiUltima },
     espiadas: v.espiadas || [], resultadoRodada: v.resultadoRodada, ultimoMais5: v.podeDesafiar ? {} : null,
-    monte: { length: v.monte }, descarte: [v.cartaDoTopo], historico: [],
+    monte: { length: v.monte }, descarte: [v.cartaDoTopo], historico: [], ausentes: v.ausentes || [],
     jogadores: v.jogadores.map((j) => ({
       id: j.id, nome: j.nome, bot: j.bot, pontos: j.pontos, vitorias: j.vitorias || 0, maos: j.maos || 0, avatar: avatarDe(j.id),
       mao: j.id === EU ? v.minhaMao : Array.from({ length: j.cartas }, (_, i) => ({ id: `x${j.id}${i}`, tipo: 'num', cor: null, valor: null })),

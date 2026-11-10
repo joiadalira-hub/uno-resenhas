@@ -56,7 +56,8 @@ export function novaPartida({ jogadores, opcoes = {}, semente } = {}) {
   const e = {
     opcoes: { ...OPCOES_PADRAO, ...opcoes, fim: { ...OPCOES_PADRAO.fim, ...(opcoes.fim || {}) } },
     semente: semente ?? Date.now(),
-    jogadores: jogadores.map((j, i) => ({ id: j.id ?? `j${i + 1}`, nome: j.nome ?? `Jogador ${i + 1}`, bot: !!j.bot, mao: [], pontos: 0, vitorias: 0, maos: 0 })),
+    jogadores: jogadores.map((j, i) => ({ id: j.id ?? `j${i + 1}`, nome: j.nome ?? `Jogador ${i + 1}`, bot: !!j.bot, chave: j.chave || null, mao: [], pontos: 0, vitorias: 0, maos: 0 })),
+    ausentes: [], // quem jogou alguma mão e saiu da mesa: continua no placar (e recupera os pontos se voltar)
     rodada: 0,
     quemComecouUltima: -1,
     fase: 'aguardando', // 'jogando' | 'fim_rodada' | 'fim_partida'
@@ -525,9 +526,30 @@ function partidaAcabou(e) {
 
 export function placar(e) {
   const porVitorias = e.opcoes.fim.modo === 'vitorias';
-  return [...e.jogadores]
-    .sort((a, b) => (porVitorias ? (b.vitorias || 0) - (a.vitorias || 0) || b.pontos - a.pontos : b.pontos - a.pontos || (b.vitorias || 0) - (a.vitorias || 0)))
-    .map((j) => ({ jogador: j.id, nome: j.nome, pontos: j.pontos, vitorias: j.vitorias || 0, maos: j.maos || 0 }));
+  const todos = [...e.jogadores, ...(e.ausentes || []).map((j) => ({ ...j, fora: true }))];
+  return todos
+    .sort((a, b) => (porVitorias ? (b.vitorias || 0) - (a.vitorias || 0) || b.pontos - a.pontos : b.pontos - a.pontos || (b.vitorias || 0) - (a.vitorias || 0)) || (b.maos || 0) - (a.maos || 0))
+    .map((j) => ({ jogador: j.id, nome: j.nome, pontos: j.pontos, vitorias: j.vitorias || 0, maos: j.maos || 0, fora: !!j.fora }));
+}
+
+// Quem sai da mesa depois de jogar alguma mão fica guardado no placar da jogatina
+function guardarAusente(e, j) {
+  if (!((j.maos || 0) > 0 || j.pontos > 0 || (j.vitorias || 0) > 0)) return;
+  if (!e.ausentes) e.ausentes = [];
+  e.ausentes = e.ausentes.filter((a) => a.id !== j.id && !(j.chave && a.chave === j.chave));
+  e.ausentes.push({ id: j.id, nome: j.nome, bot: !!j.bot, chave: j.chave || null, pontos: j.pontos, vitorias: j.vitorias || 0, maos: j.maos || 0 });
+}
+// Quem volta (mesmo aparelho ou mesmo apelido) recupera o que já tinha feito
+function novoNaMesa(e, n) {
+  const j = { id: n.id, nome: n.nome, bot: !!n.bot, chave: n.chave || null, mao: [], pontos: 0, vitorias: 0, maos: 0 };
+  const lista = e.ausentes || [];
+  const k = n.chave ? lista.findIndex((a) => a.chave === n.chave) : -1;
+  if (k >= 0) {
+    const a = lista[k];
+    j.pontos = a.pontos; j.vitorias = a.vitorias; j.maos = a.maos;
+    lista.splice(k, 1);
+  }
+  return j;
 }
 
 // Sala aberta: quem chega senta entre as mãos, com o placar zerado
@@ -535,7 +557,7 @@ export function adicionarJogador(e, j) {
   if (e.fase === 'jogando') throw new ErroJogada('fase', 'Só dá para entrar entre as mãos');
   if (e.jogadores.length >= 10) throw new ErroJogada('jogadores', 'A mesa está cheia');
   if (e.jogadores.some((x) => x.id === j.id)) return e;
-  e.jogadores.push({ id: j.id, nome: j.nome, bot: !!j.bot, mao: [], pontos: 0, vitorias: 0, maos: 0 });
+  e.jogadores.push(novoNaMesa(e, j));
   return e;
 }
 
@@ -544,6 +566,7 @@ export function removerJogadores(e, ids) {
   if (e.fase === 'jogando') throw new ErroJogada('fase', 'Só dá para sair entre as rodadas');
   const ficam = e.jogadores.filter((j) => !ids.includes(j.id));
   if (ficam.length < 2) throw new ErroJogada('jogadores', 'A mesa precisa de pelo menos 2 jogadores');
+  for (const j of e.jogadores) if (ids.includes(j.id)) guardarAusente(e, j);
   e.jogadores = ficam;
   e.quemComecouUltima = e.quemComecouUltima % ficam.length;
   e.vez = Math.min(e.vez, ficam.length - 1);
@@ -564,10 +587,12 @@ export function arrumarJogadores(e, lista) {
   if (e.fase === 'jogando') throw new ErroJogada('fase', 'Só dá para mexer na mesa entre as mãos');
   if (lista.length < 2 || lista.length > 10) throw new ErroJogada('jogadores', 'A mesa precisa de 2 a 10 jogadores');
   const antes = new Map(e.jogadores.map((j) => [j.id, j]));
+  const ficam = new Set(lista.map((n) => n.id));
+  for (const j of e.jogadores) if (!ficam.has(j.id)) guardarAusente(e, j);
   e.jogadores = lista.map((n) => {
     const j = antes.get(n.id);
-    if (j) { j.bot = !!n.bot; j.nome = n.nome || j.nome; return j; }
-    return { id: n.id, nome: n.nome, bot: !!n.bot, mao: [], pontos: 0, vitorias: 0, maos: 0 };
+    if (j) { j.bot = !!n.bot; j.nome = n.nome || j.nome; if (n.chave) j.chave = n.chave; return j; }
+    return novoNaMesa(e, n);
   });
   e.vez = 0;
   return e;
@@ -597,6 +622,7 @@ export function visaoDe(e, idJogador) {
     monte: e.monte.length,
     minhaMao: e.jogadores.find((j) => j.id === idJogador)?.mao ?? [],
     jogadores: e.jogadores.map((j) => ({ id: j.id, nome: j.nome, bot: j.bot, cartas: j.mao.length, pontos: j.pontos, vitorias: j.vitorias || 0, maos: j.maos || 0 })),
+    ausentes: (e.ausentes || []).map((j) => ({ id: j.id, nome: j.nome, bot: j.bot, pontos: j.pontos, vitorias: j.vitorias, maos: j.maos })),
     espiadas: e.espiadas.filter((x) => x.por === idJogador),
     resultadoRodada: e.resultadoRodada,
     opcoes: e.opcoes,

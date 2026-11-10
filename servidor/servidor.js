@@ -108,6 +108,8 @@ const novoToken = () => randomBytes(16).toString('hex');
 const limpaTexto = (t, max) => String(t || '').replace(/[<>]/g, '').trim().slice(0, max);
 const avatarValido = (a) => (typeof a === 'string' && a.startsWith('data:image/') && a.length < 400000 ? a : null);
 
+// quem é a mesma pessoa voltando à sala: o aparelho (ou, sem ele, o apelido)
+const chaveDe = (a) => (a.tipo !== 'humano' ? null : a.aparelho ? 'a:' + a.aparelho : 'n:' + String(a.nome || '').toLowerCase());
 class Sala {
   constructor(msg, conexao) {
     const cfg = msg.config || {};
@@ -184,7 +186,7 @@ class Sala {
   depois(ms, fn) { this.timers.push(setTimeout(() => { try { fn(); } catch (err) { log('erro no timer', this.codigo, err.message); } }, ms)); }
 
   comecar() {
-    const jogadores = this.assentos.filter((a) => a.tipo !== 'aberto').map((a) => ({ id: a.id, nome: a.nome, bot: a.tipo === 'bot' || !a.conectado }));
+    const jogadores = this.assentos.filter((a) => a.tipo !== 'aberto').map((a) => ({ id: a.id, nome: a.nome, bot: a.tipo === 'bot' || !a.conectado, chave: chaveDe(a) }));
     if (jogadores.length < 2) throw new Error('A mesa precisa de pelo menos 2 jogadores');
     this.assentos = this.assentos.filter((a) => a.tipo !== 'aberto');
     if (this.retomar && this.e && this.e.fase === 'fim_rodada') {
@@ -297,7 +299,7 @@ class Sala {
       return this.finalizar();
     }
     const tirar = () => { if (saem.length) removerJogadores(e, saem); };
-    const sentar = () => { for (const a of chegam) { adicionarJogador(e, { id: a.id, nome: a.nome, bot: a.tipo === 'bot' }); a.pendente = false; } };
+    const sentar = () => { for (const a of chegam) { adicionarJogador(e, { id: a.id, nome: a.nome, bot: a.tipo === 'bot', chave: chaveDe(a) }); a.pendente = false; } };
     // a mesa nunca fica com menos de 2 no meio da troca
     if (e.jogadores.length - saem.length >= 2) { tirar(); sentar(); } else { sentar(); tirar(); }
     if (saem.length) {

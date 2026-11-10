@@ -1034,7 +1034,7 @@ body.paisagem .supreme-tag, .baixo .supreme-tag { font-size: clamp(20px, calc(va
 /* durante a mão a tela não rola de jeito nenhum (nem puxar para atualizar) */
 html:has(body[data-tela="mesa"]), body[data-tela="mesa"] { overflow: hidden; overscroll-behavior: none; height: 100%; }
 body[data-tela="mesa"] #app { overflow: hidden; height: 100%; }
-body[data-tela="mesa"] .mesa { overflow: hidden; }
+body[data-tela="mesa"] .mesa { overflow: visible; overflow-y: clip; } /* corta só embaixo/em cima: a mão vai até a borda da tela */
 /* montando combo: o painel fica um pouco mais alto, sobre a mesa */
 .mesa.montando .painel-combo { bottom: calc(100% + var(--cw, 76px) * 0.55); }
 /* iPhone: fundo mais leve (sem mistura de cores nem desfoque animado) e cartas em camada estável — evita cartas piscando */
@@ -1056,6 +1056,8 @@ html.ios .assento img, html.ios .monte img, html.ios .topo-pilha img { -webkit-b
 .ni-fechar { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: transparent; color: var(--suave); font-size: 16px; cursor: pointer; }
 .ni-passos { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 1.35; }
 .ni-ico { display: inline-block; padding: 0 6px; border-radius: 6px; background: var(--chao); border: 1px solid var(--borda); font-weight: 800; }
+.tabela .lin.fora { opacity: .72; }
+.tag-fora { font: 700 11px var(--corpo, inherit); color: var(--suave); border: 1px solid var(--borda); border-radius: 6px; padding: 0 5px; margin-left: 4px; vertical-align: 2px; }
 </style>
 
 <div id="app"></div>

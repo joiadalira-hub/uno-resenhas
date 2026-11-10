@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarBaralho } from '../motor/cartas.js';
-import { novaPartida, aplicar, validarJogada, jogadasPossiveis, podeFazerCombo, visaoDe } from '../motor/regras.js';
+import { novaPartida, aplicar, validarJogada, jogadasPossiveis, podeFazerCombo, visaoDe, placar, removerJogadores, adicionarJogador, arrumarJogadores } from '../motor/regras.js';
 import { escolherAcao } from '../motor/bot.js';
 
 let seq = 0;
@@ -392,4 +392,26 @@ test('defesa com a última carta especial: joga o +2/+N, não bate e compra 1 na
   const p2 = C('+2', 'azul');
   const e2 = mesa({ maos: [[p2], extras(), extras()], topo: N('azul', 3), vez: 0 });
   assert.throws(() => aplicar(e2, { tipo: 'jogar', jogador: 'j1', cartas: [p2.id] }));
+});
+
+test('quem jogou mãos e saiu continua no placar e recupera os pontos se voltar', () => {
+  const e = novaPartida({ jogadores: [{ id: 'h1', nome: 'Ana', chave: 'a:1' }, { id: 'h2', nome: 'Rui', chave: 'a:2' }, { id: 'b1', nome: 'Bot Zé', bot: true }], opcoes: { salaAberta: true, fim: { modo: 'sem_fim' } } });
+  e.fase = 'fim_rodada';
+  for (const [i, j] of e.jogadores.entries()) { j.maos = 1; j.pontos = [12, 30, 0][i]; j.vitorias = i === 1 ? 1 : 0; }
+  removerJogadores(e, ['h2']);
+  let p = placar(e);
+  assert.equal(p.length, 3);
+  assert.deepEqual(p[0], { jogador: 'h2', nome: 'Rui', pontos: 30, vitorias: 1, maos: 1, fora: true });
+  assert.equal(visaoDe(e, 'h1').ausentes.length, 1);
+  // volta com outro lugar (id novo), mesmo aparelho
+  adicionarJogador(e, { id: 'h9', nome: 'Rui', chave: 'a:2' });
+  p = placar(e);
+  assert.equal(p.length, 3);
+  assert.deepEqual(p[0], { jogador: 'h9', nome: 'Rui', pontos: 30, vitorias: 1, maos: 1, fora: false });
+  // quem nunca jogou uma mão não entra no placar ao sair
+  adicionarJogador(e, { id: 'h5', nome: 'Novo', chave: 'a:5' });
+  arrumarJogadores(e, e.jogadores.filter((j) => j.id !== 'h5' && j.id !== 'b1'));
+  p = placar(e);
+  assert.ok(!p.some((x) => x.jogador === 'h5'));
+  assert.ok(p.some((x) => x.jogador === 'b1' && x.fora));
 });

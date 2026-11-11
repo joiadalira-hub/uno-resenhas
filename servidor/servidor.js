@@ -165,7 +165,8 @@ class Sala {
     return {
       codigo: this.codigo, nome: this.nome, temSenha: !!this.senha, dono: this.dono, fase: this.fase, config: this.config, votos: this.votos, assistindo: this.espectadores.map((v) => v.nome),
       retomar: this.retomar && this.e ? { rodada: this.e.rodada } : null, silenciados: [...this.silenciados],
-      assentos: this.assentos.map((a) => ({ id: a.id, tipo: a.tipo, nome: a.nome, avatar: a.avatar || null, conectado: a.tipo !== 'humano' || a.conectado, pendente: !!a.pendente, sai: !!(a.saiu || a.sai), naCall: !!(a.naCall && a.conectado) })),
+      assentos: this.assentos.map((a) => ({ id: a.id, tipo: a.tipo, nome: a.nome, avatar: a.avatar || null, conectado: a.tipo !== 'humano' || a.conectado, pendente: !!a.pendente, sai: !!(a.saiu || a.sai), naCall: !!(a.naCall && a.conectado),
+        ...(a.tipo === 'humano' ? { parado: Date.now() - (a.toque ??= Date.now()), ausente: !!a.ausente } : {}) })),
     };
   }
   enviarSala() {
@@ -186,7 +187,7 @@ class Sala {
   depois(ms, fn) { this.timers.push(setTimeout(() => { try { fn(); } catch (err) { log('erro no timer', this.codigo, err.message); } }, ms)); }
 
   comecar() {
-    const jogadores = this.assentos.filter((a) => a.tipo !== 'aberto').map((a) => ({ id: a.id, nome: a.nome, bot: a.tipo === 'bot' || !a.conectado, chave: chaveDe(a) }));
+    const jogadores = this.assentos.filter((a) => a.tipo !== 'aberto').map((a) => ({ id: a.id, nome: a.nome, bot: a.tipo === 'bot' || !a.conectado || !!a.ausente, chave: chaveDe(a) }));
     if (jogadores.length < 2) throw new Error('A mesa precisa de pelo menos 2 jogadores');
     this.assentos = this.assentos.filter((a) => a.tipo !== 'aberto');
     if (this.retomar && this.e && this.e.fase === 'fim_rodada') {
@@ -233,7 +234,7 @@ class Sala {
 
   // Entre as rodadas cada um vota: Sim (continua) ou Não (sai da mesa). Bots votam Sim.
   abrirVotacao() {
-    this.votos = {};
+    this.votos = {}; this.tirados = new Set();
     for (const j of this.e.jogadores) {
       const a = this.assento(j.id);
       if (a && (a.saiu || a.sai)) this.votos[j.id] = false; // saiu no meio da mão, ou bot que cede o lugar
@@ -249,7 +250,7 @@ class Sala {
     if (!this.votos) return;
     for (const j of this.e.jogadores) if (!(j.id in this.votos)) {
       const a = this.assento(j.id);
-      this.votos[j.id] = !(a && a.tipo === 'humano' && !a.conectado);
+      this.votos[j.id] = !(a && a.tipo === 'humano' && (!a.conectado || a.ausente)); // quem caiu ou estava ausente (bot jogando por ele) sai
     }
     this.conferirVotos();
   }
@@ -280,7 +281,7 @@ class Sala {
     return novo;
   }
   votar(id, sim) {
-    if (!this.votos || !this.e.jogadores.some((j) => j.id === id)) return;
+    if (!this.votos || !this.e.jogadores.some((j) => j.id === id) || (this.tirados && this.tirados.has(id))) return;
     this.votos[id] = !!sim;
     this.enviarSala();
     this.conferirVotos();
@@ -483,7 +484,23 @@ class Sala {
     clearTimeout(assento.timerSaida);
     assento.conexao = conexao;
     assento.conectado = true;
-    if (this.e) { const j = this.e.jogadores.find((x) => x.id === assento.id); if (j) j.bot = false; }
+    if (this.e) { const j = this.e.jogadores.find((x) => x.id === assento.id); if (j) j.bot = !!assento.ausente; } // ausente: o bot segue até a pessoa tocar na tela
+  }
+  // A pessoa mexeu no jogo: conta como presente; se um bot jogava por ela, ela volta a jogar
+  tocou(assento) {
+    const antes = assento.toque || 0;
+    assento.toque = Date.now();
+    if (assento.ausente) {
+      assento.ausente = false;
+      const j = this.e && this.e.jogadores.find((x) => x.id === assento.id);
+      if (j && assento.conectado && !assento.saiu) {
+        j.bot = false;
+        log('voltou a jogar (tirou o bot)', this.codigo, assento.nome);
+        if (this.e.fase === 'jogando') { this.agendar({ tipo: 'nada' }); this.enviarEstado(null); }
+      }
+      return this.enviarSala();
+    }
+    if (Date.now() - antes > 45000) this.enviarSala(); // estava parado: o dono deixa de ver "parado"
   }
 }
 
@@ -717,6 +734,34 @@ function tratar(conexao, msg, ctx) {
     try { sala.comecar(); } catch (err) { erro(conexao, err.message); }
     return;
   }
+  // Toque na tela (o jogo manda no máximo a cada poucos segundos): a pessoa está presente
+  if (tipo === 'ativo') return sala.tocou(assento);
+  // Pessoa parada há 1 minuto ou mais: o dono põe um bot para jogar por ela até ela tocar na tela de novo
+  if (tipo === 'botPor') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala pode pôr um bot no lugar de alguém.');
+    const alvo = sala.humanos().find((h) => h.id === msg.id);
+    const j = alvo && sala.e && sala.e.jogadores.find((x) => x.id === alvo.id);
+    if (!alvo || !j || alvo.id === assento.id || sala.fase !== 'jogando') return;
+    if (j.bot) return sala.enviarSala();
+    const falta = 60000 - (Date.now() - (alvo.toque || 0));
+    if (falta > 0) return erro(conexao, `${alvo.nome} mexeu no jogo há pouco. Dá para pôr o bot em ${Math.ceil(falta / 1000)} s.`);
+    alvo.ausente = true; j.bot = true;
+    log('bot no lugar de quem está parado', sala.codigo, alvo.nome);
+    sala.enviarSala();
+    if (sala.e.fase === 'jogando') { sala.agendar({ tipo: 'nada' }); sala.enviarEstado(null); }
+    return;
+  }
+  // Entre as mãos o dono tira alguém da mesa (sem banir: a pessoa pode voltar pelo link)
+  if (tipo === 'tirarDaMesa') {
+    if (assento.id !== sala.dono) return erro(conexao, 'Só quem criou a sala pode tirar alguém da mesa.');
+    if (!sala.votos || msg.id === assento.id || !sala.e.jogadores.some((j) => j.id === msg.id)) return;
+    sala.votos[msg.id] = false; sala.tirados.add(msg.id);
+    const alvo = sala.assento(msg.id);
+    if (alvo && alvo.conexao) erro(alvo.conexao, 'Quem criou a sala tirou você da mesa. Você pode voltar pelo link quando quiser.');
+    sala.enviarSala();
+    return sala.conferirVotos();
+  }
+  if (['acao', 'voto', 'chat'].includes(tipo)) sala.tocou(assento);
   if (tipo === 'acao') {
     const acao = { ...(msg.acao || {}), jogador: assento.id };
     if (['tempo9', 'proxima_rodada'].includes(acao.tipo)) return;

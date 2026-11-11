@@ -968,7 +968,7 @@ function chegouCarta(id) {
   ajustarLeque(el.querySelector('.leque'), n);
 }
 const estaNaCall = (id) => !!(S.online && S.online.sala && S.online.sala.assentos.some((a) => a.id === id && a.naCall));
-const caiuDaSala = (id) => !!(S.online && S.online.sala && S.online.sala.assentos.some((a) => a.id === id && a.tipo === 'humano' && !a.conectado));
+const caiuDaSala = (id) => !!(S.online && S.online.sala && S.online.sala.assentos.some((a) => a.id === id && a.tipo === 'humano' && (!a.conectado || a.ausente)));
 const CORES_JOG = ['#FF7A59', '#5BC0FF', '#B48CFF', '#4FD1A5', '#FFB547', '#FF6FB5', '#7BD389', '#F2C94C', '#6FA8FF'];
 function corDoJogador(id) {
   if (id === EU) return 'var(--destaque)';
@@ -2427,7 +2427,7 @@ function htmlVotos() {
     const ehBot = as ? as.tipo === 'bot' : j.bot;
     return `<span class="voto-lin ${v === true ? 'sim' : v === false ? 'nao' : ''}" style="--cor-jog:${corDoJogador(j.id)}">
       <span class="avatar mini-av">${htmlAvatar(j.id === EU ? { id: EU, nome: S.apelido || 'Você' } : j)}</span>
-      <b>${esc(nome)}</b><span class="voto-est">${v === true ? 'Sim ✓' : v === false ? 'Não · sai' : 'pensando…'}</span>${ehBot ? acao(j.id, as && as.sai ? 'Manter bot' : 'Tirar bot') : ''}</span>`;
+      <b>${esc(nome)}</b><span class="voto-est">${v === true ? 'Sim ✓' : v === false ? 'Não · sai' : as && as.ausente ? 'ausente 💤' : 'pensando…'}</span>${ehBot ? acao(j.id, as && as.sai ? 'Manter bot' : 'Tirar bot') : (sala && dono && as && as.tipo === 'humano' && j.id !== EU && v !== false ? `<button type="button" class="voto-acao perigo" data-tirar-mesa="${j.id}">Tirar da mesa</button>` : '')}</span>`;
   }).join('') + chegando.map((a) => `<span class="voto-lin sim" style="--cor-jog:var(--humano)">
       <span class="avatar mini-av">${a.avatar ? `<img class="figurinha" src="${a.avatar}" alt="">` : `<span class="inicial">${esc(a.nome.replace('Bot ', '')[0].toUpperCase())}</span>`}</span>
       <b>${esc(a.nome.replace('Bot ', ''))}</b><span class="voto-est">chegando ✓</span>${a.tipo === 'bot' ? acao(a.id, 'Tirar bot') : ''}</span>`).join('')
@@ -2446,6 +2446,11 @@ function atualizarVotos() {
 }
 function ligarVotos() {
   document.querySelectorAll('#votos [data-alternar]').forEach((b) => (b.onclick = () => enviar({ tipo: 'lugar', indice: Number(b.dataset.alternar) })));
+  document.querySelectorAll('#votos [data-tirar-mesa]').forEach((b) => (b.onclick = () => {
+    // toca duas vezes para confirmar
+    if (!b.classList.contains('confirma')) { b.classList.add('confirma'); b.textContent = 'Confirmar?'; return; }
+    enviar({ tipo: 'tirarDaMesa', id: b.dataset.tirarMesa });
+  }));
   ligarBotoesLugar();
 }
 function telaFim() {
@@ -2483,7 +2488,7 @@ function telaFim() {
           <p class="ajuda" style="margin:0">${ui.voto === false ? 'Votando Não, você sai da mesa.' : 'Quem votar Não sai da mesa; o jogo segue com quem ficou.'}</p>
           <button class="btn btn-principal" id="ok-voto" ${ui.voto === undefined ? 'disabled' : ''}>OK</button>`}
       <div class="votos" id="votos">${htmlVotos()}</div>
-      ${dono && S.online ? `<button class="btn btn-principal" id="forcar-proxima">${acabou ? 'Começar outra partida agora' : 'Começar a próxima mão agora'}</button><p class="ajuda" style="margin:-4px 0 0;text-align:center">A próxima mão só começa quando todos votarem ou quando você tocar aqui (quem não votou e está conectado continua; quem caiu sai).</p>` : ''}
+      ${dono && S.online ? `<button class="btn btn-principal" id="forcar-proxima">${acabou ? 'Começar outra partida agora' : 'Começar a próxima mão agora'}</button><p class="ajuda" style="margin:-4px 0 0;text-align:center">A próxima mão só começa quando todos votarem ou quando você tocar aqui (quem não votou e está conectado continua; quem caiu ou estava ausente sai). Use “Tirar da mesa” para tirar alguém antes.</p>` : ''}
     </section>
     ${S.online && S.online.sala && (aberta || S.online.sala.assentos.some((a) => a.tipo === 'aberto')) ? htmlConvite(S.online.sala) : ''}
     <div class="fim-botoes">
@@ -2551,13 +2556,13 @@ function htmlLugaresGerencia(sala) {
     const nome = a.tipo === 'aberto' ? 'Lugar vago' : a.nome.replace('Bot ', '') + (voce ? ' (você)' : '');
     const st = a.tipo === 'aberto' ? 'esperando um amigo pelo link'
       : a.tipo === 'bot' ? (a.sai ? 'bot · sai na próxima mão' : a.pendente ? 'bot · entra na próxima mão' : 'bot')
-      : [a.id === sala.dono ? 'dono' : '', a.conectado ? '' : 'ausente', a.pendente ? 'entra na próxima mão' : '', a.sai ? 'sai na próxima mão' : '', silenciados.has(a.id) ? 'silenciado no chat' : ''].filter(Boolean).join(' · ') || 'conectado';
+      : [a.id === sala.dono ? 'dono' : '', a.conectado ? '' : 'caiu', a.ausente ? 'ausente · bot jogando por ele' : paradoMs(a) >= 60000 && naMao() ? `parado há ${Math.floor(paradoMs(a) / 1000)} s` : '', a.pendente ? 'entra na próxima mão' : '', a.sai ? 'sai na próxima mão' : '', silenciados.has(a.id) ? 'silenciado no chat' : ''].filter(Boolean).join(' · ') || 'conectado';
     const av = a.tipo === 'aberto' ? '<span class="inicial">+</span>' : a.avatar || (voce && S.avatar) ? `<img class="figurinha" src="${voce && S.avatar ? S.avatar : a.avatar}" alt="">` : `<span class="inicial">${esc(a.nome.replace('Bot ', '')[0].toUpperCase())}</span>`;
     let acoes = '';
     if (dono) {
       if (a.tipo === 'aberto' && pode) acoes = `<button type="button" class="lg-acao" data-lg="bot" data-i="${i}">Pôr bot</button><button type="button" class="lg-acao" data-lg="tirar" data-i="${i}" aria-label="Tirar este lugar">✕</button>`;
       else if (a.tipo === 'bot' && pode) acoes = `<button type="button" class="lg-acao" data-lg="bot" data-i="${i}">${a.sai ? 'Manter' : 'Tirar bot'}</button>`;
-      else if (a.tipo === 'humano' && !voce) acoes = `${a.conectado ? `<button type="button" class="lg-acao" data-lg="dono" data-id="${a.id}" aria-label="Tornar dono da sala">👑 Dono</button>` : ''}<button type="button" class="lg-acao" data-lg="silenciar" data-id="${a.id}" aria-label="${silenciados.has(a.id) ? 'Liberar no chat' : 'Silenciar no chat'}">${silenciados.has(a.id) ? '🔊' : '🔇'}</button><button type="button" class="lg-acao perigo" data-lg="expulsar" data-id="${a.id}">Tirar</button>`;
+      else if (a.tipo === 'humano' && !voce) acoes = `${podeBotPor(a) ? `<button type="button" class="lg-acao" data-lg="botpor" data-id="${a.id}">🤖 Bot joga</button>` : ''}${a.conectado ? `<button type="button" class="lg-acao" data-lg="dono" data-id="${a.id}" aria-label="Tornar dono da sala">👑 Dono</button>` : ''}<button type="button" class="lg-acao" data-lg="silenciar" data-id="${a.id}" aria-label="${silenciados.has(a.id) ? 'Liberar no chat' : 'Silenciar no chat'}">${silenciados.has(a.id) ? '🔊' : '🔇'}</button><button type="button" class="lg-acao perigo" data-lg="expulsar" data-id="${a.id}">Tirar</button>`;
     }
     const setas = dono && pode ? `<span class="lg-setas"><button type="button" data-lg="mover" data-i="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Subir">▲</button><button type="button" data-lg="mover" data-i="${i}" data-dir="1" ${i === n - 1 ? 'disabled' : ''} aria-label="Descer">▼</button></span>` : '';
     return `<div class="lg-linha ${a.tipo} ${a.tipo === 'humano' && !a.conectado ? 'ausente' : ''}" style="--cor-jog:${CORES_JOG[i % CORES_JOG.length]}">
@@ -2586,6 +2591,7 @@ function ligarLugaresGerencia(raiz) {
     else if (t === 'bot') enviar({ tipo: 'lugar', indice: Number(b.dataset.i) });
     else if (t === 'tirar') enviar({ tipo: 'tirarLugar', indice: Number(b.dataset.i) });
     else if (t === 'silenciar') enviar({ tipo: 'silenciar', id: b.dataset.id });
+    else if (t === 'botpor') enviar({ tipo: 'botPor', id: b.dataset.id });
     else if (t === 'dono' || t === 'expulsar') {
       // ação séria: toca duas vezes para confirmar
       if (!b.classList.contains('confirma')) { box.querySelectorAll('.confirma').forEach((x) => { x.classList.remove('confirma'); x.textContent = x.dataset.txt; }); b.dataset.txt = b.textContent; b.classList.add('confirma'); b.textContent = 'Confirmar?'; return; }
@@ -3077,6 +3083,55 @@ async function processarFoto(arquivo) {
 // Conversa com o servidor por WebSocket. O servidor guarda o jogo; aqui só mostramos e pedimos jogadas.
 // identifica este aparelho: quem sai e volta (mesmo sem o link guardado) reocupa o próprio lugar, sem ficar duplicado
 const APARELHO = (() => { let a = ler('ur-aparelho', null); if (!a) { a = Math.random().toString(36).slice(2) + Date.now().toString(36); gravar('ur-aparelho', a); } return a; })();
+// ---------- Quem larga o jogo aberto ----------
+// O jogo avisa o servidor quando a pessoa toca na tela (no máximo a cada 8 s). Parada há 1 min, o dono pode pôr um bot
+// para jogar por ela; quando ela tocar na tela de novo, volta a jogar.
+const paradoMs = (a) => (a && a.parado != null ? a.parado + (Date.now() - ((S.online && S.online.salaEm) || Date.now())) : 0);
+const naMao = () => !!(S.online && S.online.sala && S.online.sala.fase === 'jogando' && S.e && S.e.fase === 'jogando');
+const podeBotPor = (a) => !!(a && a.tipo === 'humano' && a.id !== EU && a.conectado && !a.ausente && !a.sai && naMao() && S.e.jogadores.some((j) => j.id === a.id) && paradoMs(a) >= 60000);
+let ultimoAtivo = 0;
+function avisarAtivo() {
+  const o = S.online;
+  if (!o || !o.sala || o.espectador || !o.ws || o.ws.readyState !== 1) return;
+  const eu = o.sala.assentos.find((a) => a.id === EU);
+  if (!eu) return;
+  if (!eu.ausente && Date.now() - ultimoAtivo < 8000) return;
+  ultimoAtivo = Date.now();
+  enviar({ tipo: 'ativo' });
+  if (eu.ausente) setTimeout(() => { eu.ausente = false; atualizarParados(); }, 400); // o aviso some depois do toque (o toque não cai numa carta embaixo)
+}
+window.addEventListener('pointerdown', avisarAtivo, true);
+window.addEventListener('keydown', avisarAtivo, true);
+function atualizarParados() {
+  const o = S.online, sala = o && o.sala;
+  const naMesa = !!(sala && S.tela === 'mesa' && !o.espectador);
+  // eu: um bot está jogando por mim
+  const eu = naMesa && sala.assentos.find((a) => a.id === EU);
+  let av = document.getElementById('volta-bot');
+  if (eu && eu.ausente) {
+    if (!av) {
+      av = document.createElement('div'); av.id = 'volta-bot'; av.setAttribute('role', 'button');
+      av.innerHTML = '<div class="vb-caixa"><span class="vb-icone" aria-hidden="true">🤖</span><b>Um bot está jogando por você</b><span>Você ficou parado e quem criou a sala colocou um bot no seu lugar.</span><span class="btn btn-principal">Toque para voltar a jogar</span></div>';
+      document.body.appendChild(av);
+    }
+  } else if (av) av.remove();
+  // dono: quem está na vez e parado há 1 min
+  let bp = document.getElementById('bot-por');
+  const vez = naMesa && sala.dono === EU && naMao() && S.e.jogadores[S.e.vez];
+  const alvo = vez && sala.assentos.find((a) => a.id === vez.id);
+  if (alvo && podeBotPor(alvo)) {
+    const nome = alvo.nome;
+    if (!bp) {
+      bp = document.createElement('button'); bp.id = 'bot-por'; bp.type = 'button';
+      document.body.appendChild(bp);
+    }
+    bp.dataset.id = alvo.id;
+    bp.innerHTML = `💤 ${esc(nome)} está parado há ${Math.floor(paradoMs(alvo) / 1000)} s · <b>🤖 Bot joga por ele</b>`;
+    bp.onclick = () => { enviar({ tipo: 'botPor', id: bp.dataset.id }); bp.remove(); };
+  } else if (bp) bp.remove();
+  if (sala && sala.dono === EU && document.getElementById('cfg-lugares') && naMao()) atualizarLugaresConfig();
+}
+setInterval(atualizarParados, 1000);
 function enviar(msg) {
   const o = S.online;
   if (msg.tipo === 'entrar' || msg.tipo === 'criar') msg.aparelho = APARELHO;
@@ -3247,7 +3302,8 @@ function receberDoServidor(m) {
   }
   if (m.tipo === 'sala') {
     const donoAntes = o.sala && o.sala.dono;
-    o.sala = m.sala;
+    o.sala = m.sala; o.salaEm = Date.now();
+    setTimeout(atualizarParados, 0);
     if (o.souDono !== (m.sala.dono === EU)) { o.souDono = m.sala.dono === EU; guardarSala(); }
     atualizarBotsConfig();
     atualizarLugaresConfig();
